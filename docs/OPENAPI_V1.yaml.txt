@@ -1,0 +1,36 @@
+info:
+  title: API Quản lý Giao dịch & Số dư (Tenant System)
+  version: 1.0.0-draft
+servers:
+  - url: http://localhost:8080/api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Đăng ký Tenant mới
+      responses:
+        '201':
+          description: Đăng ký thành công
+  /issue:
+    post:
+      summary: Phát hành token/điểm (Issue)
+      responses:
+        '200':
+          description: Thành công
+  /redeem:
+    post:
+      summary: Quy đổi token (Redeem)
+      responses:
+        '200':
+          description: Thành công
+  /balance:
+    get:
+      summary: Kiểm tra số dư ví
+      responses:
+        '200':
+          description: Thành công
+  /history:
+    get:
+      summary: Truy vấn lịch sử giao dịch
+      responses:
+        '200':
+          description: Thành công
