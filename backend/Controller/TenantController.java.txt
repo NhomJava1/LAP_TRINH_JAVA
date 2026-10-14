@@ -1,0 +1,24 @@
+package com.example.backend.controller;
+
+import com.example.backend.entity.Tenant;
+import com.example.backend.repository.TenantRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/v1/tenants")
+public class TenantController {
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> registerTenant(@RequestBody Tenant tenant) {
+        if (tenantRepository.existsByName(tenant.getName())) {
+            return ResponseEntity.badRequest().body("Tenant name is already taken!");
+        }
+        Tenant savedTenant = tenantRepository.save(tenant);
+        return ResponseEntity.ok(savedTenant);
+    }
+}
