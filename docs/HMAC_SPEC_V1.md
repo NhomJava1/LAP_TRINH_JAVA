@@ -1,0 +1,11 @@
+## 1.HTTP Headers
+- `X-Tenant-Id`: Mã định danh Tenant.
+- `X-Timestamp`: Thời gian gửi request theo định dạng Unix Epoch (tính bằng giây).
+- `X-Nonce`: Chuỗi ngẫu nhiên duy nhất cho mỗi request (dùng chống Replay Attack).
+- `X-Signature`: Chữ ký HMAC-SHA256 (chuỗi Hex 64 ký tự).
+
+## 2.Tạo chuỗi cần ký 
+String-to-Sign = HTTP-Method + "\n" + Request-Path + "\n" + X-Timestamp + "\n" + X-Nonce + "\n" + SHA256(Request-Body)
+
+## 3. Thuật toán tính chữ ký
+X-Signature = HMAC-SHA256(SecretKey, String-to-Sign)
