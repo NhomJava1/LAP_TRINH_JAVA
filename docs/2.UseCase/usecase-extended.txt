@@ -1,0 +1,50 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName DejaVu Sans
+skinparam usecase {
+  BorderColor #555555
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #888888
+}
+title OctaPoint: Use case mở rộng (Should: xanh dương, Could: xám)
+
+actor "Merchant" as M
+actor "System Admin" as A
+actor "Merchant System\n(POS / e-commerce, SDK)" as MS
+actor "AI Agent\n(qua MCP)" as AI
+actor "Sui Blockchain\n(Testnet)" as SUI
+
+rectangle "OctaPoint" {
+  usecase "UC-22\nTruy vấn số dư qua MCP" as UC22 #CFE3F7
+  usecase "UC-23\nTruy vấn lịch sử qua MCP" as UC23 #CFE3F7
+  usecase "UC-24\nTruy vấn rule qua MCP" as UC24 #CFE3F7
+  usecase "UC-25\nCấu hình rule nâng cao\n(hạn dùng, tier, multiplier)" as UC25 #CFE3F7
+  usecase "UC-26\nXem analytics" as UC26 #CFE3F7
+  usecase "UC-27\nQuản lý hạn mức gas theo tenant" as UC27 #CFE3F7
+  usecase "UC-28\nNhận webhook khi SETTLED" as UC28 #CFE3F7
+  usecase "UC-29\nĐối soát DB và chain" as UC29 #CFE3F7
+  usecase "UC-30\nQuản lý nhân viên (STAFF)" as UC30 #E5E5E5
+  usecase "UC-31\nRetry thủ công\nsettlement FAILED" as UC31 #E5E5E5
+  usecase "UC-32\nNeo hash sổ cái lên Sui" as UC32 #E5E5E5
+  usecase "UC-33\nMCP tool ghi\n(có xác nhận)" as UC33 #E5E5E5
+}
+
+AI --> UC22
+AI --> UC23
+AI --> UC24
+AI --> UC33
+M --> UC25
+M --> UC30
+M --> UC26
+A --> UC26
+A --> UC27
+A --> UC29
+A --> UC31
+MS --> UC28
+UC29 --> SUI
+UC32 --> SUI
+A --> UC32
+@enduml
