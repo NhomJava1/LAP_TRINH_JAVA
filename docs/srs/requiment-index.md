@@ -301,13 +301,3 @@ Cổng cắt phạm vi: cuối Sprint 5 (3–7/11). Nếu Must chưa xong, áp d
 FR-17 (MCP) giữ ở Should cao vì tên đề tài có MCP. Cắt FR-17 chỉ khi đã cắt hết các mục trên.
 
 ---
-
-## 8. Câu hỏi mở cần chốt
-
-| # | Câu hỏi | Người quyết | Hạn |
-|---|---|---|---|
-| Q1 | Option A (seq theo CreditAccount) có khả thi trong MVP không? Nếu không, dùng Phương án B | TV, chốt trong ADR | Trước khi merge SCRUM-11; ADR Sprint 3 |
-| Q2 | Đồng ý chuyển FR-16, FR-21, FR-24 sang Won't? | Nhóm, sau đó báo giảng viên | Review SCRUM-11 |
-| Q3 | Vai trò MVP: ADMIN và MERCHANT (STAFF là Could). Cần cập nhật schema và OpenAPI cho khớp | Nhóm | Review SCRUM-11 |
-| Q4 | Tên trạng thái settlement: dùng PENDING/SETTLED/FAILED (khác bản nháp OpenAPI dùng CONFIRMED). Cập nhật OpenAPI, SQL, outbox cho khớp | DT, K | Sprint 3 |
-| Q5 | API issue nhận `amountVnd` (không nhận số điểm). Cập nhật OpenAPI và SDK cho khớp | K | Sprint 3 |
