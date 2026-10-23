@@ -31,3 +31,6 @@ management:
     web:
       exposure:
         include: '*'
+  app:
+  security:
+    api-key-master-key: "12345678901234567890123456789012"
