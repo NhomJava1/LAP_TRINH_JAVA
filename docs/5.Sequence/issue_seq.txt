@@ -1,0 +1,178 @@
+@startuml
+autonumber
+skinparam defaultFontName DejaVu Sans
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+skinparam shadowing false
+
+skinparam sequence {
+  ArrowColor #1D7A5F
+  ActorBorderColor #1D7A5F
+  LifeLineBorderColor #1D7A5F
+  LifeLineBackgroundColor #E8F5F0
+  ParticipantBorderColor #1D7A5F
+  ParticipantBackgroundColor #FFFFFF
+}
+
+title Sequence: Issue Điểm & Settlement Lên Sui (Bản Chốt Chuẩn Kiến Trúc v1.2)
+
+actor "Merchant POS / Web" as POS
+box "Client Side (SDK)" #F9F9F9
+  participant "TS SDK" as SDK
+end box
+
+box "OctaPoint Core (Spring Boot)" #EBF5FB
+  participant "Security / HMAC Filter" as Filter
+  participant "Credit Core Service" as Service
+end box
+
+database "Redis" as Redis #FDEBD0
+database "PostgreSQL\n(Single Source of Truth)" as DB #E8F8F5
+
+box "Settlement Subsystem" #FEF9E7
+  participant "Settlement Worker" as Worker
+  participant "Signer Service\n(NodeJS / TS)" as Signer
+end box
+
+participant "Sui Blockchain\n(Testnet)" as Sui #EAECEE
+
+== GIAI ĐOẠN 1: GIAO DỊCH NGHIỆP VỤ ĐỒNG BỘ (OFF-CHAIN, p95 < 100ms) ==
+
+POS -> SDK: issue({ customerId, orderId, amountVnd })
+activate SDK
+SDK -> SDK: 1. Sinh Nonce (UUID) và Timestamp\n2. Tính HMAC-SHA256 từ secret\n3. Đính kèm Idempotency-Key
+SDK -> Filter: POST /api/merchant/v1/credits/issue\n[Headers: X-OP-Key, X-OP-Timestamp, X-OP-Nonce, X-OP-Signature, Idempotency-Key]
+activate Filter
+
+' Tầng bảo mật 1: Bucket4j IP Rate Limit (In-memory, siêu nhẹ)
+Filter -> Filter: [Bucket4j] Kiểm tra Rate limit theo IP
+break Vượt hạn mức request của IP
+  Filter --> SDK: HTTP 429 Too Many Requests (RATE_LIMITED)
+  SDK --> POS: Báo lỗi quá tải
+end
+
+' Tầng bảo mật 2: Tra cứu Key, lệch thời gian và chữ ký
+Filter -> Filter: Kiểm tra API Key, lệch Timestamp (±300s), tính & so sánh HMAC-SHA256
+break Sai chữ ký / Timestamp lệch / Key không tồn tại hoặc bị thu hồi
+  Filter --> SDK: HTTP 401 Unauthorized
+  SDK --> POS: Báo lỗi xác thực
+end
+
+' Tầng bảo mật 3: Chống Replay Attack trên Redis (Chỉ gọi khi chữ ký đã hợp lệ)
+Filter -> Redis: SETNX nonce_key TTL 600s
+activate Redis
+Redis --> Filter: Kết quả lưu Nonce
+deactivate Redis
+break Nonce đã tồn tại trong Redis (Replay Attack)
+  Filter --> SDK: HTTP 401 AUTH_NONCE_REUSED
+  SDK --> POS: Báo lỗi phát lại yêu cầu
+end
+
+' Tầng bảo mật 4: Kiểm tra Scope quyền hạn
+Filter -> Filter: Kiểm tra API Key có quyền ISSUE?
+break Thiếu quyền
+  Filter --> SDK: HTTP 403 FORBIDDEN_SCOPE
+  SDK --> POS: Báo lỗi quyền hạn
+end
+
+Filter -> Service: Chuyển request đã xác thực hợp lệ
+activate Service
+
+Service -> DB: Kiểm tra trạng thái Tenant (APPROVED?)
+activate DB
+break Tenant chưa được duyệt hoặc bị khóa
+  Service --> Filter: HTTP 403 TENANT_NOT_APPROVED
+  Filter --> SDK: HTTP 403 TENANT_NOT_APPROVED
+  SDK --> POS: Báo lỗi tenant
+end
+
+' Xử lý Idempotency
+Service -> DB: Tra cứu theo (tenant_id, idempotency_key)
+break Key đã tồn tại VÀ trùng request_hash
+  DB --> Service: Kết quả giao dịch ban đầu
+  Service --> Filter: Kết quả ban đầu
+  Filter --> SDK: HTTP 200 OK (Idempotent replay)
+  SDK --> POS: Nhận kết quả cũ
+end
+break Key đã tồn tại NHƯNG khác request_hash
+  Service --> Filter: Xung đột dữ liệu
+  Filter --> SDK: HTTP 409 Conflict (IDEMPOTENCY_CONFLICT)
+  SDK --> POS: Báo lỗi xung đột key
+end
+note right of Service
+  Nếu 2 request đồng thời cùng key:
+  Ràng buộc UNIQUE (tenant_id, idempotency_key)
+  xử lý ở mức DB, request đến sau sẽ chờ/nhận kết quả.
+end note
+
+' Giao dịch DB Nguyên tử
+group #LightYellow "Database Transaction (Nguyên tử - Cực nhanh)"
+  Service -> DB: 1. SELECT rule active của tenant (tính số điểm)
+  Service -> DB: 2. INSERT end_customer ON CONFLICT DO NOTHING\n(Nếu mới: INSERT outbox_event CREATE_ACCOUNT)
+  Service -> DB: 3. UPDATE balance SET amount = amount + points,\nnext_chain_seq = next_chain_seq + 1\nWHERE customer_id = ?\nRETURNING next_chain_seq - 1 (cấp chain_seq bắt đầu từ 0)
+  Service -> DB: 4. INSERT ledger_entry (Append-only, chain_seq, rule_id, balance_after)
+  Service -> DB: 5. INSERT outbox_event MINT (status='PENDING', chain_seq)
+  DB --> Service: COMMIT thành công
+end
+deactivate DB
+
+Service --> Filter: Nghiệp vụ thành công
+deactivate Service
+Filter --> SDK: HTTP 201 Created\n{ transactionId, points, balanceAfter, settlementStatus: "PENDING" }
+deactivate Filter
+SDK --> POS: Tích điểm thành công (In hóa đơn ngay)
+deactivate SDK
+
+== GIAI ĐOẠN 2: SETTLEMENT BẤT ĐỒNG BỘ LÊN SUI (BACKGROUND) ==
+
+loop Chu kỳ quét mỗi 5 - 10 giây
+  Worker -> DB: SELECT * FROM outbox_event\nWHERE status = 'PENDING' AND next_retry_at <= now()\nAND customer_id NOT IN (SELECT customer_id FROM outbox_event WHERE status IN ('FAILED', 'PROCESSING'))\nORDER BY customer_id, chain_seq ASC\nFOR UPDATE SKIP LOCKED LIMIT 50
+  activate Worker
+  activate DB
+  DB --> Worker: Danh sách sự kiện chờ settlement
+  
+  Worker -> DB: UPDATE outbox_event SET status = 'PROCESSING' và COMMIT\n(Giải phóng kết nối DB trước khi gọi mạng ngoại vi)
+  deactivate DB
+
+  opt Có sự kiện PENDING
+    Worker -> Signer: POST /internal/tx [X-Service-Token]\nBody: { events: [ { type: "MINT", customerRef, amount, seq, eventId } ] }
+    activate Signer
+    
+    Signer -> Signer: 1. Xác thực X-Service-Token & allowlist\n2. Xây dựng Programmable Transaction Block (PTB)\n3. Ký bằng Platform Key (Signer tự trả phí gas)
+    Signer -> Sui: Thực thi PTB qua JSON-RPC / gRPC
+    activate Sui
+
+    alt Giao dịch On-chain Thành công
+      Sui -> Sui: Kiểm tra seq == account.seq,\ncộng số dư CreditAccount, tăng seq,\nphát event Minted(eventId, amount)
+      Sui --> Signer: Kết quả (digest, gasUsed)
+      Signer --> Worker: HTTP 200 { status: "SETTLED", digest, gasUsed }
+      
+      Worker -> DB: 1. INSERT INTO chain_tx (digest, gas_used)\n2. UPDATE outbox_event SET status = 'SETTLED', digest = ?\n(TUYỆT ĐỐI KHÔNG SỬA LEDGER_ENTRY)
+      
+    else Lỗi Mạng / Timeout / RPC / Contract Abort
+      Sui --> Signer: Lỗi hoặc Gateway Timeout
+      Signer --> Worker: Báo lỗi (kèm mã lỗi chi tiết)
+      
+      ' Cơ chế kiểm tra trạng thái On-chain khi lỗi
+      Worker -> Sui: Đọc trực tiếp seq hiện tại của CreditAccount on-chain
+      alt On-chain thực tế ĐÃ áp dụng (account.seq > chain_seq)
+        Worker -> DB: UPDATE outbox_event SET status = 'SETTLED'
+      else On-chain THỰC SỰ chưa chạy
+        Worker -> DB: UPDATE outbox_event SET status = 'PENDING',\nattempts = attempts + 1, next_retry_at = now() + backoff
+        opt Vượt quá số lần Retry tối đa (vd: 5 lần)
+          Worker -> DB: UPDATE outbox_event SET status = 'FAILED'\n(Hiển thị cảnh báo lên Admin Portal, UC-19)
+          note right of Worker #FFAAAA
+            **CẢNH BÁO HEAD-OF-LINE BLOCKING:**
+            Sự kiện FAILED sẽ chặn các giao dịch sau
+            của khách hàng này cho đến khi Admin xử lý.
+          end note
+        end
+      end
+    end
+    deactivate Sui
+    deactivate Signer
+  end
+  deactivate Worker
+end
+
+@enduml
