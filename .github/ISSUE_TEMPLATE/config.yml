@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "Bảng quản lý công việc Jira"
+    url: "https://chamchamcham212628.atlassian.net"
+    about: "Theo dõi tiến độ Sprint và phân bổ backlog trên Jira"

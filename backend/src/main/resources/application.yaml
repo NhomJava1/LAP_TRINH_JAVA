@@ -2,6 +2,10 @@ server:
   port: 8080
 
 spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
   application:
     name: octapoint-core
   
@@ -31,3 +35,6 @@ management:
     web:
       exposure:
         include: '*'
+  app:
+  security:
+    api-key-master-key: "12345678901234567890123456789012"
