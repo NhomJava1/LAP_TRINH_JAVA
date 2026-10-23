@@ -1,0 +1,69 @@
+openapi: 3.0.3
+info:
+  title: OctaPoint Mock API
+  description: Mock server cho dự án Credit-as-a-Service
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/credits/balance:
+    get:
+      summary: Lấy số dư credit của khách hàng
+      operationId: getCreditBalance
+      parameters:
+        - name: customerId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditBalance'
+  /api/v1/credits/issue:
+    post:
+      summary: Cấp điểm (Issue) cho khách hàng
+      operationId: issueCredit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueRequest'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssueResponse'
+components:
+  schemas:
+    CreditBalance:
+      type: object
+      properties:
+        customerId:
+          type: string
+        balance:
+          type: integer
+        settlementStatus:
+          type: string
+    IssueRequest:
+      type: object
+      properties:
+        customerId:
+          type: string
+        amountVnd:
+          type: integer
+    IssueResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        pointsIssued:
+          type: integer
+        status:
+          type: string
