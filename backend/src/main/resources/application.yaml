@@ -2,10 +2,6 @@ server:
   port: 8080
 
 spring:
-  data:
-    redis:
-      host: localhost
-      port: 6379
   application:
     name: octapoint-core
   
@@ -30,11 +26,16 @@ spring:
       enabled: true
       path: /h2-console
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
 management:
   endpoints:
     web:
       exposure:
         include: '*'
-  app:
+
+app:
   security:
     api-key-master-key: "12345678901234567890123456789012"
