@@ -1,0 +1,29 @@
+# ==============================================================================
+# OctaPoint - CODEOWNERS Policy
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Quy tắc bắt buộc review theo thư mục phụ trách:
+# - Thay đổi ở thư mục nào sẽ tự động yêu cầu thành viên phụ trách thư mục đó review.
+# - Mọi Pull Request phải có ít nhất 1 phê duyệt từ Code Owner trước khi merge vào develop.
+# ==============================================================================
+
+# Quy tắc mặc định cho toàn bộ repository (Nhóm trưởng / Core Team)
+* @minhnbk01
+
+# 1. Tài liệu kiến trúc, đặc tả yêu cầu, URD, SRS & UML
+/docs/ @minhnbk01
+
+# 2. Backend Core Engine (Spring Boot, Security Filter, DB Migrations, Core Services)
+/backend/ @minhnbk01 @votuankiet28102019
+
+# 3. Frontend Web Portals (Next.js, Merchant & Admin Portals, Tailwind CSS)
+/frontend/ @minhnbk01
+
+# 4. Sui Move Smart Contracts & Blockchain Settlement
+/contracts/ @minhnbk01
+/signer/ @minhnbk01
+
+# 5. Cấu hình hệ thống, CI/CD Workflows, Docker Compose & GitHub Settings
+/.github/ @minhnbk01
+/docker-compose*.yml @minhnbk01
+/README.md @minhnbk01
