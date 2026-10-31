@@ -3,9 +3,9 @@ services:
     image: postgres:15-alpine
     container_name: octapoint_postgres
     environment:
-      POSTGRES_DB: octapoint_db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secretpassword
+      POSTGRES_DB: ${POSTGRES_DB:-octapoint_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
       - "5432:5432"
     volumes:
@@ -17,5 +17,36 @@ services:
     ports:
       - "6379:6379"
 
+  sui-cli:
+    build:
+      context: .
+      dockerfile: docker/sui/Dockerfile
+    volumes:
+      - sui-config:/root/.sui
+      - ./contracts:/workspace/contracts
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+
+  core:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-octapoint_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      API_KEY_MASTER_KEY: ${API_KEY_MASTER_KEY:?Set API_KEY_MASTER_KEY in .env}
+      API_KEY_ADMIN_TOKEN: ${API_KEY_ADMIN_TOKEN:?Set API_KEY_ADMIN_TOKEN in .env}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+
 volumes:
   pgdata:
+  sui-config:
