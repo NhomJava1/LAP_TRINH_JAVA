@@ -1,1 +1,65 @@
+# IDE
 .vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+nbproject/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+
+# Java / Maven
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# Spring Boot
+spring-shell.log
+application-local.yaml
+
+
+# Testing
+surefire-reports/
+failsafe-reports/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Tooling / local AI config
+.claude/
+*.local
+private-note/
+
+# Node / Signer
+signer/node_modules/
+signer/dist/
+signer/.env
+
+# Docker / local data
+docker/data/
+postgres-data/
+redis-data/

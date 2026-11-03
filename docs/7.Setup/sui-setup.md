@@ -151,6 +151,40 @@ Test result: OK. Total tests: 1; passed: 1; failed: 0
 - Chỉ dùng ví này cho Testnet. Không dùng lại khóa Mainnet.
 - Đã thêm vào `.gitignore`: `*.keystore`, `.sui/`.
 
+## 9. SCRUM-36 / SCRUM-17 — Move v0
+
+Package Move v0 đã được build, test và publish thành công trên Sui Testnet.
+
+### Deployment
+
+- Network: `testnet`
+- Package ID: `0x908b5905ece899ac50024a2d33d96cd2465608b44a338689d778a6480fd5c17b`
+- Module: `octapoint`
+- Publish transaction: `7e8a57oRUKNVvnJYuuGwM5bEdhRKrDpNsuksRBta6FRx`
+
+### Object model
+
+- `AdminCap`: owned capability object; bắt buộc khi gọi `issue`.
+- `Balance`: shared object; lưu field `amount`.
+- `UpgradeCap`: quyền nâng cấp package, thuộc ví publish.
+
+### Object IDs
+
+- AdminCap: `0xab12c867037151d10d00ee14acd114fbf0ee6d4488cab42f936c1fbcc2834fbc`
+- Balance: `0x76d11e3a5a2ed8d3b78aa7592ba6fe1902d094be4ee0119ed0c7ea051158c0c7`
+- UpgradeCap: `0x222bd938d9bab7990984e3ad6cbb634b0b93e289d22d9b3ab5408f445ac54e1a`
+
+### Verification
+
+- `sui move build`: PASS
+- `sui move test`: PASS — 1 test passed, 0 failed.
+- `issue(100)`: PASS
+- `issue(25)`: PASS
+- Final `Balance.amount`: `125`
+- Issue transaction: `EH8LXkLnJ9yfuj2yRzowPP6hVA94Dn2UD45zEanathJF`
+
+Chi tiết mô hình object và thao tác dành cho người mới nằm trong note local, không commit vào repository.
+
 ## 8. Bước kế tiếp
 
 Dùng môi trường này cho task Move/Signer tiếp theo của SCRUM-16:
