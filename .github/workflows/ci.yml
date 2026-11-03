@@ -1,0 +1,20 @@
+name: CI Smoke Test
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Environment file
+        run: cp .env.example .env
+
+      - name: Build docker-compose
+        run: docker compose build

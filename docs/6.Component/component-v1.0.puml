@@ -1,0 +1,85 @@
+@startuml OctaPoint_Component
+left to right direction
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+
+title OctaPoint - Component Diagram (MVP Chuẩn Kiến Trúc)
+
+actor "Merchant System\n(POS / e-commerce)" as Merchant
+actor "Merchant / Admin" as PortalUser
+cloud "Sui Blockchain\n(Testnet)" as Sui
+
+package "Client Tier" {
+  component "Merchant Portal\n(Next.js)" as MerchantPortal
+  component "Admin Portal\n(Next.js)" as AdminPortal
+  component "TypeScript SDK" as SDK
+}
+
+package "OctaPoint Core (Spring Boot)" {
+  component "Security / JWT Filter" as JwtFilter
+  component "Security / HMAC Filter" as HmacFilter
+  
+  component "Portal API" as PortalApi
+  component "Merchant Credit API" as CreditApi
+  
+  component "Tenant & Auth Service" as AuthService
+  component "Credit Core Service" as CreditCore
+  component "Rule Service" as RuleService
+  component "Audit Service" as AuditService
+  component "Outbox Worker" as OutboxWorker
+}
+
+database "PostgreSQL\n(SSOT: ACID)" as Postgres
+collections "Redis\n(Cache / Nonce / Bucket4j)" as Redis
+component "Sui Signer Service\n(Node.js / TypeScript)" as Signer
+
+' Luồng tương tác Client -> Gateway
+PortalUser --> MerchantPortal
+PortalUser --> AdminPortal
+Merchant --> SDK
+
+MerchantPortal --> JwtFilter
+AdminPortal --> JwtFilter
+JwtFilter --> PortalApi
+
+SDK --> HmacFilter
+HmacFilter --> CreditApi
+
+' Luồng xử lý Portal nội bộ
+PortalApi --> AuthService
+PortalApi --> RuleService
+PortalApi --> AuditService
+
+' Luồng xử lý Credit Core nội bộ
+CreditApi --> CreditCore
+CreditApi --> AuditService
+CreditCore --> RuleService : tính điểm theo rule
+
+' Tương tác Hạ tầng (Infrastructure)
+HmacFilter --> Redis : nonce / rate limit (Bucket4j)
+CreditCore --> Redis : cache rule / tenant
+CreditCore --> Postgres : balance + ledger + outbox (1 Tx)
+
+AuthService --> Postgres
+RuleService --> Postgres
+AuditService --> Postgres
+
+' Settlement Pipeline
+OutboxWorker --> Postgres : claim outbox (SKIP LOCKED)
+OutboxWorker --> Signer : internal HTTP (X-Service-Token)
+Signer --> Sui : execute PTB (Platform Key)
+OutboxWorker --> Sui : query status & seq (Sui RPC Client)
+
+note right of CreditCore
+  Issue/Redeem:
+  balance + ledger + outbox
+  trong cùng 1 DB transaction
+end note
+
+note bottom of OutboxWorker
+  Batch 5-10 giây
+  Retry + backoff
+  Đảm bảo thứ tự chain_seq
+end note
+@enduml

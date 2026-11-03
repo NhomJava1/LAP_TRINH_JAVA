@@ -1,0 +1,216 @@
+@startuml
+autonumber
+skinparam defaultFontName DejaVu Sans
+skinparam BoxPadding 10
+skinparam ParticipantPadding 10
+skinparam shadowing false
+
+skinparam sequence {
+  ArrowColor #1D7A5F
+  ActorBorderColor #1D7A5F
+  LifeLineBorderColor #1D7A5F
+  LifeLineBackgroundColor #E8F5F0
+  ParticipantBorderColor #1D7A5F
+  ParticipantBackgroundColor #FFFFFF
+}
+
+title Sequence: Redeem Điểm & Settlement Lên Sui (Bản Chốt Chuẩn v2.0)
+
+actor "Merchant POS / Web" as POS
+box "Client Side (SDK)" #F9F9F9
+  participant "TS SDK" as SDK
+end box
+
+box "OctaPoint Core (Spring Boot)" #EBF5FB
+  participant "Security / HMAC Filter" as Filter
+  participant "Credit API Controller" as Controller
+  participant "Credit Core Service" as Service
+end box
+
+database "Redis" as Redis #FDEBD0
+database "PostgreSQL\n(Single Source of Truth)" as DB #E8F8F5
+
+box "Settlement Subsystem" #FEF9E7
+  participant "Settlement Worker" as Worker
+  participant "Signer Service\n(NodeJS / TS)" as Signer
+end box
+
+participant "Sui Blockchain\n(Testnet)" as Sui #EAECEE
+
+== GIAI ĐOẠN 1: GIAO DỊCH NGHIỆP VỤ ĐỒNG BỘ (OFF-CHAIN, p95 < 100ms) ==
+
+POS -> SDK: redeem({ customerId, orderId, pointsToRedeem })
+activate SDK
+SDK -> SDK: Sinh Nonce và Timestamp, tính HMAC-SHA256,\nđính kèm Idempotency-Key
+SDK -> Filter: POST /api/merchant/v1/credits/redeem\n[X-OP-Key, X-OP-Timestamp, X-OP-Nonce, X-OP-Signature, Idempotency-Key]
+activate Filter
+
+Filter -> Redis: Bucket4j: trừ token theo IP
+activate Redis
+Redis --> Filter: Kết quả
+deactivate Redis
+break Hết token theo IP
+  Filter --> SDK: HTTP 429 RATE_LIMITED
+  SDK --> POS: Báo lỗi: quá hạn mức request
+end
+
+Filter -> Filter: Tra API key (còn hiệu lực?), kiểm tra lệch Timestamp (±300s),\nso khớp chữ ký HMAC-SHA256
+break Key bị thu hồi / sai chữ ký / Timestamp lệch
+  Filter --> SDK: HTTP 401 (AUTH_KEY_REVOKED / AUTH_INVALID_SIGNATURE / AUTH_TIMESTAMP_EXPIRED)
+  SDK --> POS: Báo lỗi xác thực
+end
+
+Filter -> Redis: SETNX nonce:{keyId}:{nonce} TTL 600s\n(chỉ sau khi chữ ký đã đúng)
+activate Redis
+Redis --> Filter: 1 (mới) hoặc 0 (đã tồn tại)
+deactivate Redis
+break Nonce đã tồn tại (replay)
+  Filter --> SDK: HTTP 401 AUTH_NONCE_REUSED
+  SDK --> POS: Báo lỗi phát lại yêu cầu
+end
+
+Filter -> Redis: Bucket4j: trừ token theo API key\n(sau khi key đã được xác thực)
+activate Redis
+Redis --> Filter: Kết quả
+deactivate Redis
+break Hết token theo API key
+  Filter --> SDK: HTTP 429 RATE_LIMITED
+  SDK --> POS: Báo lỗi: quá hạn mức request
+end
+
+Filter -> Filter: Kiểm tra scope REDEEM
+break Thiếu quyền REDEEM
+  Filter --> SDK: HTTP 403 FORBIDDEN_SCOPE
+  SDK --> POS: Báo lỗi quyền hạn
+end
+
+' Filter giữ nguyên activate để chờ response trả về
+Filter -> Controller: Request hợp lệ, chuyển tiếp Controller
+activate Controller
+
+Controller -> Controller: [@Valid] pointsToRedeem là số nguyên dương,\ncustomerId và orderId không rỗng
+break Dữ liệu không hợp lệ
+  Controller --> Filter: HTTP 400 VALIDATION_ERROR
+  Filter --> SDK: HTTP 400 Bad Request
+  SDK --> POS: Báo lỗi dữ liệu đầu vào
+end
+
+Controller -> Service: DTO đã hợp lệ
+activate Service
+
+Service -> DB: SELECT tenant (status) theo tenant của API key\n(đọc trực tiếp DB, không dùng cache để bảo đảm tính tươi mới)
+activate DB
+break Tenant không ở trạng thái APPROVED
+  Service --> Filter: HTTP 403 TENANT_NOT_APPROVED
+  Filter --> SDK: HTTP 403 TENANT_NOT_APPROVED
+  SDK --> POS: Báo lỗi: tenant chưa duyệt hoặc bị khóa
+end
+
+Service -> DB: SELECT end_customer theo (tenant_id, external_user_id)
+break Khách hàng không tồn tại trong tenant này
+  Service --> Filter: HTTP 404 NOT_FOUND
+  Filter --> SDK: HTTP 404 NOT_FOUND
+  SDK --> POS: Báo lỗi: không tìm thấy khách hàng
+end
+
+Service -> DB: Tìm ledger_entry theo (tenant_id, idempotency_key)
+break Key đã tồn tại và trùng request_hash
+  DB --> Service: Kết quả giao dịch cũ
+  Service --> Filter: Kết quả cũ
+  Filter --> SDK: HTTP 200 OK (Idempotent replay)
+  SDK --> POS: Nhận kết quả cũ (không trừ điểm lần 2)
+end
+break Key đã tồn tại nhưng khác request_hash
+  Service --> Filter: IDEMPOTENCY_CONFLICT
+  Filter --> SDK: HTTP 409 Conflict
+  SDK --> POS: Báo lỗi xung đột Idempotency-Key
+end
+
+group Database Transaction (một transaction duy nhất)
+  Service -> DB: UPDATE balance\nSET amount = amount - :points, next_chain_seq = next_chain_seq + 1\nWHERE customer_id = :id AND tenant_id = :tenantId AND amount >= :points\nRETURNING amount, next_chain_seq - 1
+
+  alt Không đủ điểm (0 dòng được cập nhật)
+    DB --> Service: 0 dòng
+    note over Service, DB #LightPink
+      Không đủ số dư!
+      Không ghi ledger_entry và outbox_event.
+      Request bị từ chối chỉ ghi audit_log nếu cần.
+    end note
+    Service --> Filter: HTTP 422 INSUFFICIENT_BALANCE
+    Filter --> SDK: HTTP 422 Unprocessable Entity
+    SDK --> POS: Báo lỗi: khách không đủ điểm
+  else Đủ điểm (1 dòng được cập nhật)
+    DB --> Service: balance_after, chain_seq
+    Service -> DB: INSERT ledger_entry (type = REDEEM, amount, balance_after, chain_seq,\nidempotency_key, request_hash)
+    Service -> DB: INSERT outbox_event (op_type = REDEEM, status = PENDING, chain_seq, order_key = chain_seq)
+    DB --> Service: COMMIT thành công
+  end
+end
+note right of Service
+  Hai request đồng thời cùng Idempotency-Key:
+  nếu INSERT ledger_entry vi phạm UNIQUE thì ROLLBACK
+  cả transaction (hoàn lại phần trừ điểm),
+  rồi đọc lại và trả kết quả của request thắng.
+end note
+deactivate DB
+
+Service --> Controller: Nghiệp vụ thành công
+deactivate Service
+Controller --> Filter: Dữ liệu giao dịch hoàn tất
+deactivate Controller
+
+Filter --> SDK: HTTP 200 OK\n{ transactionId, pointsRedeemed, balanceAfter, settlementStatus: "PENDING" }
+deactivate Filter
+SDK --> POS: Quy đổi điểm thành công (In hóa đơn trừ tiền)
+deactivate SDK
+
+== GIAI ĐOẠN 2: SETTLEMENT BẤT ĐỒNG BỘ LÊN SUI (BACKGROUND) ==
+
+loop Chu kỳ 5 - 10 giây
+  Worker -> DB: Khôi phục sự kiện PROCESSING quá hạn (cũ hơn N phút):\nkiểm tra on-chain rồi SETTLED hoặc về PENDING
+  activate Worker
+  activate DB
+  Worker -> DB: Chọn sự kiện PENDING đã đến hạn (next_retry_at <= now),\nbỏ qua customer đang có sự kiện FAILED hoặc PROCESSING,\nORDER BY customer_id, order_key (CREATE_ACCOUNT = -1)\nFOR UPDATE SKIP LOCKED LIMIT 50
+  DB --> Worker: Danh sách sự kiện chờ settlement
+  Worker -> DB: Đánh dấu PROCESSING, ghi processing_started_at, COMMIT
+  deactivate DB
+
+  opt Có sự kiện
+    Worker -> Signer: POST /internal/tx [X-Service-Token]\n{ events: [ { type: "REDEEM", customerRef, amount, seq, eventId } ] }
+    activate Signer
+    Signer -> Signer: Kiểm tra token và allowlist thao tác,\nxây giao dịch (PTB) gọi Move redeem, ký bằng Platform Key
+    Signer -> Sui: Gửi giao dịch đã ký (gRPC qua @mysten/sui)
+    activate Sui
+
+    alt Thành công
+      Sui -> Sui: Kiểm tra seq == account.seq và balance >= amount,\ntrừ balance on-chain, tăng seq,\nphát event Redeemed(eventId, amount)
+      Sui --> Signer: Kết quả (digest, gasUsed)
+      Signer --> Worker: { executed: true, digest, gasUsed }
+      Worker -> DB: INSERT chain_tx (digest, gas_used)\nUPDATE outbox_event SET status = 'SETTLED'\n(KHÔNG sửa ledger_entry)
+    else Lỗi
+      Sui --> Signer: Lỗi (kèm loại lỗi)
+      Signer --> Worker: Lỗi (kèm loại lỗi)
+      Worker -> Sui: Đọc seq hiện tại của CreditAccount on-chain
+      alt On-chain đã áp dụng (account.seq > chain_seq của sự kiện)
+        Worker -> DB: UPDATE outbox_event SET status = 'SETTLED'\n(digest lấy từ chain nếu có)
+      else Move abort xác định (ví dụ balance on-chain không đủ)
+        Worker -> DB: UPDATE outbox_event SET status = 'FAILED' ngay, không retry\n(cảnh báo Admin Portal, UC-19)
+        note right of Worker #FFAAAA
+          Abort xác định nghĩa là DB và chain lệch nhau:
+          retry vô ích, cần Admin xử lý và đối soát (FR-29).
+          FAILED chặn các sự kiện sau của cùng customer (FR-33).
+        end note
+      else Lỗi tạm thời (timeout, mạng, RPC)
+        Worker -> DB: UPDATE outbox_event SET status = 'PENDING',\nattempts = attempts + 1, next_retry_at = now() + backoff
+        opt Vượt Max Retry (ví dụ 5 lần)
+          Worker -> DB: UPDATE outbox_event SET status = 'FAILED'\n(cảnh báo Admin Portal, UC-19)
+        end
+      end
+    end
+    deactivate Sui
+    deactivate Signer
+  end
+  deactivate Worker
+end
+
+@enduml
