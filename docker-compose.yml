@@ -25,6 +25,9 @@ services:
       - sui-config:/root/.sui
       - ./contracts:/workspace/contracts
     working_dir: /workspace
+    # Dockerfile dùng ENTRYPOINT=sui; override để mở shell Linux.
+    entrypoint: []
+    command: ["bash"]
     stdin_open: true
     tty: true
 
