@@ -3,8 +3,8 @@
 | **Phiên bản** | 1.0 (dự thảo) |
 |---|---|
 | **Ticket** | SCRUM-12 |
-| **Căn cứ** | `requirement-index-v0.2.md` (mã FR, NFR, MoSCoW) |
-| **Sơ đồ** | `usecase-mvp.png` (Must), `usecase-extended.png` (Should và Could). Mã nguồn: `usecase-mvp.puml`, `usecase-extended.puml` |
+| **Căn cứ** | [`requiment-index.md`](../1.SRS/requiment-index.md) (v0.2; mã FR, NFR, MoSCoW) |
+| **Sơ đồ** | [`usecase-mvp.png`](./usecase-mvp.png) (Must), [`usecase-extended.png`](./usecase-extended.png) (Should và Could). Mã nguồn: [`usecase-mvp.txt`](./usecase-mvp.txt), [`usecase-extended.txt`](./usecase-extended.txt) |
 
 ---
 
