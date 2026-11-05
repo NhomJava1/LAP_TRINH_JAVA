@@ -12,9 +12,10 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
         <h2 className="font-bold text-xl mb-6">Merchant Portal</h2>
         <nav className="flex flex-col gap-2">
           <Link href="/merchant" className="p-2 hover:bg-gray-100 rounded">Dashboard</Link>
+          <Link href="/merchant/api-keys" className="p-2 hover:bg-gray-100 rounded">Quản lý API Key</Link>
         </nav>
       </aside>
       <main className="flex-1 p-8">{children}</main>
     </div>
   );
-}
+} 
