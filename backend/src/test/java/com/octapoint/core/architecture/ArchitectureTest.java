@@ -1,7 +1,6 @@
 package com.octapoint.core.architecture;
 
 import com.octapoint.core.chain.ChainClient;
-import com.octapoint.core.chain.MockChainClient;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
@@ -28,5 +27,5 @@ public class ArchitectureTest {
     static final ArchRule other_modules_depend_on_chain_client_abstraction = noClasses()
         .that().resideOutsideOfPackage("..chain..")
         .should().dependOnClassesThat()
-        .areAssignableTo(MockChainClient.class);
+        .haveFullyQualifiedName("com.octapoint.core.chain.MockChainClient");
 }
