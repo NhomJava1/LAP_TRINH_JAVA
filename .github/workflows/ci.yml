@@ -1,4 +1,4 @@
-name: CI Smoke Test
+name: CI
 
 on:
   push:
@@ -6,8 +6,58 @@ on:
   pull_request:
     branches: [ "main", "master", "develop" ]
 
+permissions:
+  contents: read
+
 jobs:
-  build-docker:
+  backend:
+    name: Backend build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build and test backend
+        run: mvn --batch-mode verify
+
+  signer:
+    name: Signer build and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: signer
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: signer/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check signer
+        run: npm test
+
+      - name: Build signer
+        run: npm run build
+
+  docker:
+    name: Docker Compose build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -16,5 +66,5 @@ jobs:
       - name: Set up Environment file
         run: cp .env.example .env
 
-      - name: Build docker-compose
+      - name: Build Docker Compose services
         run: docker compose build

@@ -4,9 +4,9 @@
 |---|---|
 | **Phiên bản** | 1.0 |
 | **Tiêu chuẩn áp dụng** | IEEE 830-1998 Software Requirements Specifications |
-| **Căn cứ** | `docs/1.SRS/requiment-index.md`, `docs/2.UseCase/usecase-v1.md`, `docs/3.URD/user-requiment-document.md` |
-| **Sơ đồ liên quan** | `docs/4.ActivityDiagram/image.png`, `docs/5.Sequence/issue_seq.png`, `docs/5.Sequence/redeem_seq.png` |
-| **Trạng thái** | Dự thảo hoàn thiện, chờ nhóm và giảng viên phê duyệt |
+| **Căn cứ** | `docs/1.SRS/requiment-index.md` (v0.2), `docs/2.UseCase/usecase-v1.md`, `docs/3.URD/user-requiment-document.md` |
+| **Sơ đồ liên quan** | Use case MVP/extended, activity issue/settlement, sequence issue/redeem và component architecture (xem mục 1.5) |
+| **Trạng thái** | Dự thảo cập nhật theo SCRUM-117, chờ nhóm và giảng viên review |
 
 ---
 
@@ -15,6 +15,7 @@
 | Phiên bản | Nội dung | Căn cứ |
 |---|---|---|
 | 1.0 | Hoàn thiện đặc tả theo Requirement Index v0.2, URD, Use Case v1 và các sơ đồ luồng | SCRUM-11, SCRUM-12, SCRUM-13 |
+| 1.0 — bản dự thảo SCRUM-117 | Căn chỉnh danh mục FR/NFR/UC, ma trận truy vết và tham chiếu tài liệu/sơ đồ theo nguồn hiện có | Requirement Index v0.2; Use Case v1; các sơ đồ hiện hành |
 
 ---
 
@@ -26,7 +27,7 @@
 4. [Yêu cầu chức năng chi tiết](#4-yêu-cầu-chức-năng-chi-tiết-detailed-functional-requirements)  
 5. [Yêu cầu phi chức năng](#5-yêu-cầu-phi-chức-năng-non-functional-requirements)  
 6. [Mô hình dữ liệu và quy tắc nghiệp vụ](#6-mô-hình-dữ-liệu-và-quy-tắc-nghiệp-vụ-data-model-and-business-rules)  
-7. [Mô tả use case chính](#7-mô-tả-use-case-chính)  
+7. [Danh mục và mô tả use case](#7-danh-mục-và-mô-tả-use-case)
 8. [Ma trận truy vết](#8-ma-trận-truy-vết-yêu-cầu-traceability-matrix)  
 9. [Phạm vi ngoài MVP và hướng phát triển](#9-phạm-vi-ngoài-mvp-và-hướng-phát-triển)  
 10. [Tiêu chí nghiệm thu MVP](#10-tiêu-chí-nghiệm-thu-mvp)
@@ -103,14 +104,15 @@ Số dư nghiệp vụ tức thời được xác định bởi PostgreSQL. Dữ
 
 ### 1.5. Tài liệu tham khảo
 
-1. `docs/1.SRS/requiment-index.md` — mã FR/NFR, ưu tiên MoSCoW, tiêu chí nghiệm thu và kịch bản demo.
-2. `docs/2.UseCase/usecase-v1.md` — actor, use case và luồng chính.
-3. `docs/3.URD/user-requiment-document.md` — nhu cầu người dùng và quy tắc nghiệp vụ.
-4. `docs/4.ActivityDiagram/image.png` — luồng xử lý API issue và settlement.
-5. `docs/5.Sequence/issue_seq.png` — sequence issue.
-6. `docs/5.Sequence/redeem_seq.png` — sequence redeem.
-7. IEEE Std 830-1998.
-8. Tài liệu Sui, Sui Move và `@mysten/sui` SDK.
+1. [`requiment-index.md`](./requiment-index.md) — Requirement Index v0.2: mã FR/NFR, ưu tiên MoSCoW, tiêu chí nghiệm thu, cách xác minh và kịch bản demo.
+2. [`usecase-v1.md`](../2.UseCase/usecase-v1.md) — actor, use case, quan hệ và luồng chính.
+3. [`user-requiment-document.md`](../3.URD/user-requiment-document.md) — nhu cầu người dùng và quy tắc nghiệp vụ.
+4. Use case diagrams: [`usecase-mvp.png`](../2.UseCase/usecase-mvp.png), [`usecase-extended.png`](../2.UseCase/usecase-extended.png); nguồn sơ đồ: [`usecase-mvp.txt`](../2.UseCase/usecase-mvp.txt), [`usecase-extended.txt`](../2.UseCase/usecase-extended.txt).
+5. [`image.png`](../4.ActivityDiagram/image.png) — activity xử lý issue và settlement.
+6. Sequence diagrams: [`issue_seq.png`](../5.Sequence/issue_seq.png), [`redeem_seq.png`](../5.Sequence/redeem_seq.png); nguồn sơ đồ: [`issue_seq.txt`](../5.Sequence/issue_seq.txt), [`redeem_seq.txt`](../5.Sequence/redeem_seq.txt).
+7. Component diagram: [`component-v1.0.puml`](../6.Component/component-v1.0.puml) và [`image.png`](../6.Component/image.png).
+8. IEEE Std 830-1998.
+9. Tài liệu Sui, Sui Move và `@mysten/sui` SDK.
 
 ---
 
@@ -497,17 +499,20 @@ RETURNING amount, next_chain_seq - 1 AS chain_seq;
 ### 4.9. FR-09 — Settlement bất đồng bộ bằng transactional outbox
 
 1. Issue/redeem thành công phải tạo outbox event trong cùng transaction với ledger.
-2. Worker chạy theo chu kỳ cấu hình 5–10 giây khi có sự kiện chờ.
-3. Worker lấy event `PENDING` đến hạn retry bằng `FOR UPDATE SKIP LOCKED`.
-4. Worker bảo đảm thứ tự `chain_seq` theo từng cặp tenant/customer; không để event sau vượt event trước đang lỗi.
-5. Worker chuyển event sang `PROCESSING` và commit trước khi gọi Signer.
-6. Worker gom event thành batch nhưng phải giữ thứ tự logic theo customer.
-7. Request gửi Signer có `eventId`, tenant/customer, loại, points, `chain_seq`, payload và service token.
-8. Sau khi xác minh thành công trên Sui, worker lưu digest và chuyển event sang `SETTLED`.
-9. Lỗi hoặc timeout phải tăng attempts, tính exponential backoff và chuyển lại `PENDING` nếu còn retry.
-10. Sau tối đa 5 lần retry, chuyển `FAILED`, lưu nguyên nhân và hiển thị cho Admin.
-11. Kết quả timeout/không rõ phải được kiểm tra on-chain trước khi gửi lại.
-12. `settlementMode = MOCK` chỉ dùng cho MockChainClient; không được gán digest cũ cho giao dịch mock mới.
+2. Khi customer mới phát sinh, hệ thống phải tạo yêu cầu khởi tạo `CreditAccount` trước khi settlement các lệnh mint/redeem của account đó; có thể gom khởi tạo account và lệnh đầu tiên trong cùng một PTB nguyên tử.
+3. Worker chạy theo chu kỳ cấu hình 5–10 giây khi có sự kiện chờ. Đây là chu kỳ quét/gom batch, không phải cam kết thời gian xác nhận của Sui.
+4. Worker lấy event `PENDING` đến hạn retry bằng `FOR UPDATE SKIP LOCKED`.
+5. Worker bảo đảm thứ tự `chain_seq` theo từng cặp tenant/customer; không để event sau vượt event trước đang lỗi.
+6. Worker chuyển event sang `PROCESSING` và commit trước khi gọi Signer.
+7. Worker gom event thành batch nhưng phải giữ thứ tự logic theo customer.
+8. Request gửi Signer có `eventId`, tenant/customer, loại, points, `chain_seq`, payload và service token.
+9. Sau khi xác minh thành công trên Sui, worker lưu digest và chuyển event sang `SETTLED`.
+10. Lỗi hoặc timeout phải tăng attempts, tính exponential backoff và chuyển lại `PENDING` nếu còn retry.
+11. Khi đạt giới hạn retry được cấu hình, chuyển `FAILED`, lưu nguyên nhân và hiển thị cho Admin. Giá trị giới hạn retry cụ thể là cấu hình vận hành, không được Requirement Index v0.2 cố định.
+12. Kết quả timeout/không rõ phải được kiểm tra on-chain trước khi gửi lại.
+13. `settlementMode = MOCK` chỉ dùng cho MockChainClient; không được gán digest cũ cho giao dịch mock mới.
+
+**Head-of-line blocking:** Một event `FAILED` hoặc đang xử lý chặn các event có `chain_seq` lớn hơn của cùng `(tenant, customer)` cho đến khi event trước được xử lý/đối soát. Các customer khác vẫn có thể được worker xử lý độc lập. FR-13 yêu cầu Admin xem giao dịch `FAILED`; retry thủ công là FR-33 (Could), không phải cam kết phục hồi tự động trong MVP.
 
 ### 4.10. FR-10 — Smart contract Sui Move
 
@@ -522,14 +527,15 @@ Mỗi cặp `(tenant, customer)` có một `CreditAccount` on-chain với tối 
 
 Contract phải:
 
-1. Kiểm tra quyền gọi của Signer/đối tượng quản trị.
-2. Nhận thao tác mint/redeem kèm `eventId`, `chain_seq` và dữ liệu giao dịch.
-3. Kiểm tra `chain_seq` khớp `CreditAccount.seq`.
-4. Từ chối sequence sai bằng lỗi tương đương `EINVALID_SEQ`.
-5. Cập nhật balance và tăng `seq` trong cùng transaction Move.
-6. Phát event `Minted` hoặc `Redeemed` chứa eventId và thông tin cần đối soát.
-7. Dùng capability quản trị tương đương `AdminCap` cho thao tác quản trị.
-8. Cho phép Signer đọc object/event/transaction để worker xác minh settlement.
+1. Khởi tạo `CreditAccount` cho cặp `(tenant, customer)` mới với balance ban đầu bằng 0 và `seq = 0`; có thể tạo account trong cùng PTB với lệnh đầu tiên.
+2. Kiểm tra quyền gọi của Signer/đối tượng quản trị.
+3. Nhận thao tác mint/redeem kèm `eventId`, `chain_seq` và dữ liệu giao dịch.
+4. Kiểm tra `chain_seq` khớp `CreditAccount.seq`.
+5. Từ chối sequence sai bằng lỗi tương đương `EINVALID_SEQ`.
+6. Cập nhật balance và tăng `seq` trong cùng transaction Move.
+7. Phát event `Minted` hoặc `Redeemed` chứa eventId và thông tin cần đối soát.
+8. Dùng capability quản trị tương đương `AdminCap` cho thao tác quản trị.
+9. Cho phép Signer đọc object/event/transaction để worker xác minh settlement.
 
 Option A với `seq` là thiết kế MVP. Nếu kiểm chứng Sui/Move cho thấy không khả thi, nhóm phải ghi ADR thay thế và không được tuyên bố exactly-once on-chain chỉ dựa vào outbox.
 
@@ -661,6 +667,7 @@ Các yêu cầu sau được ghi nhận để bảo đảm không bỏ sót mã 
 4. Ledger không được sửa/xóa.
 5. Worker phải retry lỗi với backoff và bảo toàn thứ tự theo customer.
 6. Timeout chain phải được đối chiếu trước retry để hạn chế duplicate.
+7. Khi event của một customer bị `FAILED` hoặc chưa được giải quyết, các event sau của chính customer đó phải chờ (head-of-line blocking); event của customer khác không bị chặn bởi event này. Admin phải có thể phát hiện/đối soát trạng thái lỗi. Retry thủ công là FR-33 (Could), không nằm trong cam kết bắt buộc của MVP.
 
 ### 5.4. NFR-04 — CI/CD và chất lượng mã nguồn
 
@@ -865,9 +872,65 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 
 ---
 
-## 7. Mô tả use case chính
+## 7. Danh mục và mô tả use case
 
-### UC-01 — Đăng ký tenant
+### 7.1. Danh mục Use Case
+
+Danh mục dưới đây giữ nguyên mã, actor, mức ưu tiên và liên kết FR của Use Case v1. Các UC không có luồng chi tiết trong tài liệu nguồn chỉ được liệt kê ở mức tóm tắt; không tự bổ sung hành vi.
+
+| UC | Use case | Actor | Mức | FR liên quan |
+|---|---|---|---|---|
+| UC-01 | Đăng ký tenant | Merchant | Must | FR-01 |
+| UC-02 | Đăng nhập Portal | Merchant, System Admin | Must | FR-04 |
+| UC-03 | Xem trạng thái tenant | Merchant | Must | FR-12 |
+| UC-04 | Duyệt, từ chối, khóa tenant | System Admin | Must | FR-02 |
+| UC-05 | Tạo API key | Merchant | Must | FR-03 |
+| UC-06 | Xoay vòng API key | Merchant | Must | FR-03 |
+| UC-07 | Thu hồi API key | Merchant | Must | FR-03 |
+| UC-08 | Cấu hình rule earn/redeem | Merchant | Must | FR-08, FR-12 |
+| UC-09 | Issue điểm | Merchant System | Must | FR-05, FR-11 |
+| UC-10 | Redeem điểm | Merchant System | Must | FR-06, FR-11 |
+| UC-11 | Tra cứu số dư | Merchant System, Merchant | Must | FR-07, FR-11, FR-12 |
+| UC-12 | Tra cứu lịch sử giao dịch | Merchant System, Merchant | Must | FR-07, FR-11, FR-12 |
+| UC-13 | Xác thực và giới hạn request | Hệ thống | Must | FR-14 |
+| UC-14 | Tính điểm theo rule | Hệ thống | Must | FR-05, FR-06, FR-08 |
+| UC-15 | Ghi audit log | Hệ thống | Must | FR-15 |
+| UC-16 | Settlement lên Sui theo batch | Outbox Worker; Sui Blockchain (secondary) | Must | FR-09, FR-10 |
+| UC-17 | Xem dashboard hệ thống | System Admin | Must | FR-13 |
+| UC-18 | Xem audit log | System Admin | Must | FR-13, FR-15 |
+| UC-19 | Xem giao dịch settlement thất bại | System Admin | Must | FR-13 |
+| UC-20 | Trả kết quả cũ theo Idempotency-Key | Hệ thống | Must | FR-05 |
+| UC-21 | Kiểm tra on-chain trước khi gửi lại | Outbox Worker | Must | FR-09 |
+| UC-22 | Truy vấn số dư qua MCP | AI Agent | Should | FR-17 |
+| UC-23 | Truy vấn lịch sử qua MCP | AI Agent | Should | FR-17 |
+| UC-24 | Truy vấn rule qua MCP | AI Agent | Should | FR-17 |
+| UC-25 | Cấu hình rule nâng cao (hạn dùng, tier, multiplier) | Merchant | Should | FR-18 |
+| UC-26 | Xem analytics | Merchant, System Admin | Should | FR-19 |
+| UC-27 | Quản lý hạn mức gas theo tenant | System Admin | Should | FR-27 |
+| UC-28 | Nhận webhook khi SETTLED | Merchant System | Should | FR-28 |
+| UC-29 | Đối soát DB và chain | System Admin, Sui Blockchain | Should | FR-29 |
+| UC-30 | Quản lý nhân viên (STAFF) | Merchant | Could | FR-31 |
+| UC-31 | Retry thủ công settlement FAILED | System Admin | Could | FR-33 |
+| UC-32 | Neo hash sổ cái lên Sui | System Admin, Sui Blockchain | Could | FR-30 |
+| UC-33 | MCP tool ghi (có xác nhận) | AI Agent | Could | FR-32 |
+
+### 7.2. Quan hệ include, extend và tiền điều kiện chung
+
+| Use case gốc | Quan hệ | Use case kia | Điều kiện hoặc ý nghĩa |
+|---|---|---|---|
+| UC-06 Xoay vòng API key | include | UC-05 Tạo API key | Luôn tạo key mới |
+| UC-06 Xoay vòng API key | include | UC-07 Thu hồi API key | Luôn thu hồi key cũ |
+| UC-09, UC-10, UC-11, UC-12 (qua API) | include | UC-13 Xác thực và giới hạn request | Mọi request API đều được kiểm tra |
+| UC-09, UC-10 | include | UC-14 Tính điểm theo rule | Tính điểm tích lũy hoặc giá trị quy đổi |
+| UC-04, UC-05, UC-07, UC-08 | include | UC-15 Ghi audit log | Ghi nhận thao tác nhạy cảm |
+| UC-20 | extend | UC-09, UC-10 | Cùng Idempotency-Key và cùng nội dung request |
+| UC-21 | extend | UC-16 | Settlement timeout hoặc kết quả không xác định |
+
+Mọi use case Portal trừ UC-01 yêu cầu đăng nhập (UC-02). Các UC mức hệ thống là các bước dùng chung/điều kiện trong luồng, không phải actor bên ngoài.
+
+### 7.3. Đặc tả các use case chính
+
+#### UC-01 — Đăng ký tenant
 
 | Mục | Nội dung |
 |---|---|
@@ -877,7 +940,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Luồng thay thế | Dữ liệu sai `400`; email trùng `409` |
 | Hậu điều kiện | Tenant tồn tại nhưng chưa được issue/redeem |
 
-### UC-04 — Duyệt, từ chối, khóa tenant
+#### UC-04 — Duyệt, từ chối, khóa tenant
 
 | Mục | Nội dung |
 |---|---|
@@ -887,7 +950,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Luồng thay thế | Chuyển trạng thái không hợp lệ `409` |
 | Hậu điều kiện | Tenant được phép hoặc bị chặn giao dịch theo trạng thái |
 
-### UC-09 — Issue điểm
+#### UC-09 — Issue điểm
 
 | Mục | Nội dung |
 |---|---|
@@ -897,7 +960,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Luồng thay thế | Sai auth `401`; sai scope/trạng thái `403`; rate limit `429`; payload sai `400`; cùng key khác payload `409` |
 | Hậu điều kiện | Balance tăng, một ledger entry và một outbox event được tạo |
 
-### UC-10 — Redeem điểm
+#### UC-10 — Redeem điểm
 
 | Mục | Nội dung |
 |---|---|
@@ -907,7 +970,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Luồng thay thế | Balance không đủ `422`; không tạo ledger/outbox thành công |
 | Hậu điều kiện | Balance giảm đúng số điểm, không âm |
 
-### UC-16 — Settlement lên Sui theo batch
+#### UC-16 — Settlement lên Sui theo batch
 
 | Mục | Nội dung |
 |---|---|
@@ -917,7 +980,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Luồng thay thế | Lỗi/timeout → đọc trạng thái on-chain → retry backoff; quá số lần → `FAILED` |
 | Hậu điều kiện | Event `SETTLED` có digest hoặc `FAILED` có lỗi |
 
-### UC-20 — Trả kết quả cũ theo Idempotency-Key
+#### UC-20 — Trả kết quả cũ theo Idempotency-Key
 
 | Mục | Nội dung |
 |---|---|
@@ -926,7 +989,7 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 | Cùng payload | Trả response giao dịch cũ; không thay đổi balance |
 | Khác payload | Trả `409 Conflict` |
 
-### UC-21 — Kiểm tra on-chain trước retry
+#### UC-21 — Kiểm tra on-chain trước retry
 
 | Mục | Nội dung |
 |---|---|
@@ -940,31 +1003,47 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 
 ### 8.1. FR với UR và Use Case
 
-| FR | UR liên quan | Use case |
-|---|---|---|
-| FR-01 | UR-01 | UC-01 |
-| FR-02 | UR-13 | UC-04 |
-| FR-03 | UR-03 | UC-05, UC-06, UC-07 |
-| FR-04 | UR-06 | UC-02 |
-| FR-05 | UR-07 | UC-09, UC-14, UC-20 |
-| FR-06 | UR-08 | UC-10, UC-14 |
-| FR-07 | UR-05, UR-09 | UC-03, UC-11, UC-12 |
-| FR-08 | UR-04 | UC-08, UC-14 |
-| FR-09 | UR-17, UR-18 | UC-16, UC-21 |
-| FR-10 | UR-17 | UC-16 |
-| FR-11 | UR-10 | UC-09, UC-10, UC-11, UC-12 |
-| FR-12 | UR-02, UR-05 | UC-03, UC-08, UC-11, UC-12 |
-| FR-13 | UR-14 | UC-17, UC-18, UC-19 |
-| FR-14 | UR-11 | UC-13 |
-| FR-15 | UR-15 | UC-15, UC-18 |
-| FR-17 | UR-21 | UC-22, UC-23, UC-24 |
-| FR-18 | UR-19 | UC-25 |
-| FR-19 | UR-20 | UC-26 |
-| FR-27 | UR-16 | UC-27 |
-| FR-28 | UR-12 | UC-28 |
-| FR-29 | UR-22 | UC-29 |
+| FR | Mức | UR liên quan | Use case |
+|---|---|---|---|
+| FR-01 | Must | UR-01 | UC-01 |
+| FR-02 | Must | UR-13 | UC-04 |
+| FR-03 | Must | UR-03 | UC-05, UC-06, UC-07 |
+| FR-04 | Must | UR-06 | UC-02 |
+| FR-05 | Must | UR-07 | UC-09, UC-14, UC-20 |
+| FR-06 | Must | UR-08 | UC-10, UC-14 |
+| FR-07 | Must | UR-05, UR-09 | UC-11, UC-12 |
+| FR-08 | Must | UR-04 | UC-08, UC-14 |
+| FR-09 | Must | UR-17, UR-18 | UC-16, UC-21 |
+| FR-10 | Must | UR-17 | UC-16 |
+| FR-11 | Must | UR-10 | UC-09, UC-10, UC-11, UC-12 |
+| FR-12 | Must | UR-02, UR-05 | UC-03, UC-08, UC-11, UC-12 |
+| FR-13 | Must | UR-14 | UC-17, UC-18, UC-19 |
+| FR-14 | Must | UR-11 | UC-13 |
+| FR-15 | Must | UR-15 | UC-15, UC-18 |
+| FR-16 | Won't | — | — |
+| FR-17 | Should | UR-21 | UC-22, UC-23, UC-24 |
+| FR-18 | Should | UR-19 | UC-25 |
+| FR-19 | Should | UR-20 | UC-26 |
+| FR-20 | Could | — | Chưa có UC trong Use Case v1 |
+| FR-21 | Won't | — | — |
+| FR-22 | Could | — | Chưa có UC trong Use Case v1 |
+| FR-23 | Could | — | Chưa có UC trong Use Case v1 |
+| FR-24 | Won't | — | — |
+| FR-25 | Could | — | Chưa có UC trong Use Case v1 |
+| FR-26 | Could | — | Chưa có UC trong Use Case v1 |
+| FR-27 | Should | UR-16 | UC-27 |
+| FR-28 | Should | UR-12 | UC-28 |
+| FR-29 | Should | UR-22 | UC-29 |
+| FR-30 | Could | — | UC-32 |
+| FR-31 | Could | — | UC-30 |
+| FR-32 | Could | — | UC-33 |
+| FR-33 | Could | — | UC-31 |
+
+UR mappings follow the current URD and Use Case v1 traceability tables. `—` means the source does not define a UR/UC link (or the requirement is Won't); no link is inferred. FR-20, FR-22, FR-23, FR-25 and FR-26 are Could requirements with no dedicated UC in the current Use Case v1.
 
 ### 8.2. FR với cách xác minh
+
+Requirement Index v0.2 defines acceptance and verification methods for Must requirements. The table therefore covers FR-01 through FR-15; Should/Could verification plans must be added when those items are taken into scope.
 
 | FR | Cách xác minh chính |
 |---|---|
@@ -986,24 +1065,26 @@ Giao dịch nghiệp vụ thành công có thể ở `PENDING` hoặc `FAILED`; 
 
 ### 8.3. NFR với cách xác minh
 
-| NFR | Cách xác minh |
-|---|---|
-| NFR-01 | Load test 20 VU, ít nhất 1.000 request/endpoint, báo cáo p95 |
-| NFR-02 | Security review, test RBAC/isolation, secret scanning |
-| NFR-03 | PostgreSQL Testcontainers, 20 request redeem đồng thời |
-| NFR-04 | GitHub Actions build/test/check bắt buộc xanh |
-| NFR-05 | Digest và ảnh Sui Explorer Testnet; báo cáo tuần 7 |
-| NFR-06 | Actuator health và metric smoke test |
+| NFR | Mức | Cách xác minh |
+|---|---|---|
+| NFR-01 | Must | Load test 20 VU, ít nhất 1.000 request/endpoint, báo cáo p95 |
+| NFR-02 | Must | Security review, test RBAC/isolation, secret scanning |
+| NFR-03 | Must | PostgreSQL Testcontainers, 20 request redeem đồng thời |
+| NFR-04 | Must | GitHub Actions build/test/check bắt buộc xanh |
+| NFR-05 | Must | Digest và ảnh Sui Explorer Testnet; báo cáo tuần 7 |
+| NFR-06 | Should | Actuator health và metric smoke test |
 
 ### 8.4. Use case với actor
 
 | Actor | Use case chính |
 |---|---|
-| Merchant | UC-01, UC-02, UC-03, UC-05, UC-06, UC-07, UC-08, UC-11, UC-12 |
-| System Admin | UC-02, UC-04, UC-17, UC-18, UC-19 |
-| Merchant System | UC-09, UC-10, UC-11, UC-12 |
-| Sui Blockchain | Nhận settlement của UC-16 |
-| AI Agent | UC-22, UC-23, UC-24 ở Should |
+| Merchant | UC-01, UC-02, UC-03, UC-05, UC-06, UC-07, UC-08, UC-11, UC-12 (Must); UC-25 (Should); UC-26 (Should); UC-30 (Could) |
+| System Admin | UC-02, UC-04, UC-17, UC-18, UC-19 (Must); UC-26, UC-27, UC-29 (Should); UC-31, UC-32 (Could) |
+| Merchant System | UC-09, UC-10, UC-11, UC-12 (Must); UC-28 (Should) |
+| Outbox Worker (internal) | UC-16, UC-21 (Must) |
+| Sui Blockchain (secondary) | Nhận settlement của UC-16 (Must); tham gia UC-29 (Should) và UC-32 (Could) |
+| AI Agent | UC-22, UC-23, UC-24 (Should); UC-33 (Could) |
+| Hệ thống | UC-13, UC-14, UC-15, UC-20 (Must) |
 
 ---
 
