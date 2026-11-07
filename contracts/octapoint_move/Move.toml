@@ -1,0 +1,9 @@
+[package]
+name = "octapoint_move"
+edition = "2024.beta"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+octapoint_move = "0x0"

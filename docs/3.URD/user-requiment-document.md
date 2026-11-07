@@ -4,7 +4,7 @@
 |---|---|
 | **Ticket** | SCRUM-13 |
 | **Người phụ trách** | Minh Hoang |
-| **Căn cứ** | `requirement-index-v0.2.md`, `usecase-v1.md`, đề tài ban đầu |
+| **Căn cứ** | [`requiment-index.md`](../1.SRS/requiment-index.md) (v0.2), [`usecase-v1.md`](../2.UseCase/usecase-v1.md), đề tài ban đầu |
 | **Trạng thái** | Dự thảo, chờ nhóm review |
 
 URD mô tả **người dùng cần gì**, bằng ngôn ngữ của người dùng. Cách hệ thống thực hiện (kỹ thuật, API, cơ sở dữ liệu) được đặc tả trong SRS và tài liệu kiến trúc.
@@ -48,8 +48,8 @@ OctaPoint là nền tảng **Credit-as-a-Service**: cho phép doanh nghiệp (si
 
 | Tài liệu | Vai trò |
 |---|---|
-| `requirement-index-v0.2.md` | Mã FR, NFR, MoSCoW, kịch bản demo |
-| `usecase-v1.md` | Actor và use case |
+| [`requiment-index.md`](../1.SRS/requiment-index.md) (v0.2) | Mã FR, NFR, MoSCoW, kịch bản demo |
+| [`usecase-v1.md`](../2.UseCase/usecase-v1.md) | Actor và use case |
 | Đề xuất đề tài ban đầu | Bối cảnh và mục tiêu gốc |
 
 ---

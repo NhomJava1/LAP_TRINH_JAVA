@@ -1,1 +1,92 @@
+# IDE
 .vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+nbproject/
+apache-maven-3.9.6/
+*.tar.gz
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# Java / Maven
+target/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+hs_err_pid*
+replay_pid*
+.mvn/wrapper/maven-wrapper.jar
+.mvn/timing.properties
+
+# Spring Boot
+spring-shell.log
+application-local.yaml
+
+# Testing
+surefire-reports/
+failsafe-reports/
+.nyc_output/
+test-results/
+playwright-report/
+
+# Tooling / local AI config
+.claude/
+*.local
+private-note/
+
+# Node / Signer
+node_modules/
+signer/node_modules/
+signer/dist/
+signer/.env
+
+# Docker / local data
+docker/data/
+postgres-data/
+redis-data/
+pgdata/
+
+# Node / npm generated files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.yarn/
+
+# Test coverage
+coverage/
+.v8/
+
+# Sui local artifacts and wallet material
+.sui/
+sui-config/
+*.bcs
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
