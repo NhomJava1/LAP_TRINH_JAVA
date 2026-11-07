@@ -1,7 +1,5 @@
 # IDE
 .vscode/
-apache-maven-3.9.6/
-*.tar.gz
 .idea/
 *.iml
 *.ipr
@@ -10,18 +8,23 @@ apache-maven-3.9.6/
 .classpath
 .settings/
 nbproject/
-nbproject/
+apache-maven-3.9.6/
+*.tar.gz
+
 # OS
 .DS_Store
 Thumbs.db
 Desktop.ini
+
 # Environment / secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 *.p12
 *.jks
+*.keystore
 
 # Java / Maven
 target/
@@ -40,10 +43,12 @@ replay_pid*
 # Spring Boot
 spring-shell.log
 application-local.yaml
-application-local.yaml
-application-local.yaml
 
 # Testing
+surefire-reports/
+failsafe-reports/
+.nyc_output/
+test-results/
 playwright-report/
 
 # Tooling / local AI config
@@ -52,6 +57,7 @@ playwright-report/
 private-note/
 
 # Node / Signer
+node_modules/
 signer/node_modules/
 signer/dist/
 signer/.env
@@ -60,6 +66,7 @@ signer/.env
 docker/data/
 postgres-data/
 redis-data/
+pgdata/
 
 # Node / npm generated files
 npm-debug.log*
@@ -72,8 +79,9 @@ pnpm-debug.log*
 # Test coverage
 coverage/
 .v8/
-.v8/
+
 # Sui local artifacts and wallet material
+.sui/
 sui-config/
 *.bcs
 
