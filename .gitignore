@@ -8,6 +8,8 @@
 .classpath
 .settings/
 nbproject/
+apache-maven-3.9.6/
+*.tar.gz
 
 # OS
 .DS_Store
@@ -22,6 +24,7 @@ Desktop.ini
 *.key
 *.p12
 *.jks
+*.keystore
 
 # Java / Maven
 target/
@@ -41,7 +44,6 @@ replay_pid*
 spring-shell.log
 application-local.yaml
 
-
 # Testing
 surefire-reports/
 failsafe-reports/
@@ -55,6 +57,7 @@ playwright-report/
 private-note/
 
 # Node / Signer
+node_modules/
 signer/node_modules/
 signer/dist/
 signer/.env
@@ -63,6 +66,7 @@ signer/.env
 docker/data/
 postgres-data/
 redis-data/
+pgdata/
 
 # Node / npm generated files
 npm-debug.log*
