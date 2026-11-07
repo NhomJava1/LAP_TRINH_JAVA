@@ -35,3 +35,4 @@ app:
   security:
     api-key-master-key: ${API_KEY_MASTER_KEY:12345678901234567890123456789012}
     admin-token: ${API_KEY_ADMIN_TOKEN:octapoint_dev_admin_token}
+    encryption-secret: ${ENCRYPTION_SECRET:my-secure-32-chars-encryption-key!!}

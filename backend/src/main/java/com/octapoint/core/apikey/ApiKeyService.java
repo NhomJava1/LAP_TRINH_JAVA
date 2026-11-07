@@ -59,4 +59,12 @@ public class ApiKeyService {
             return iv;
         }
     }
+    public record ApiKeyCreateResponse(String apiKey, String rawSecret) {}
+    public ApiKeyCreateResponse createApiKey(String tenantId) throws Exception {
+        String apiKey = "ak_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String rawSecret = "sec_" + java.util.UUID.randomUUID().toString().replace("-", "");
+        String encryptedSecret = encrypt(rawSecret);
+       
+        return new ApiKeyCreateResponse(apiKey, rawSecret);
+    }
 }
