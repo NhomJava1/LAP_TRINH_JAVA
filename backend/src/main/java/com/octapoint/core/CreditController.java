@@ -20,7 +20,7 @@ public class CreditController {
         CreditBalance mockData = new CreditBalance();
         mockData.setCustomerId(customerId);
         mockData.setBalance(100);
-        mockData.setSettlementStatus("SETTLED");
+        mockData.setSettlementStatus(com.octapoint.core.model.CreditBalance.SettlementStatusEnum.SETTLED);
 
         System.out.println("=> [MOCK API] Đã gọi lấy số dư cho: " + customerId);
         return ResponseEntity.ok(mockData);
