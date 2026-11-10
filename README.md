@@ -1,18 +1,16 @@
-# LAP_TRINH_JAVA
+# OctaPoint - Credit-as-a-Service (CaaS) Platform
 
-## Quy ước làm việc nhóm
+Chào mừng bạn đến với dự án OctaPoint. Tài liệu này hướng dẫn cách cài đặt và chạy dự án trên môi trường local (máy sạch).
 
-| Mục | Quy ước | Ví dụ |
-|---|---|---|
-| Nhánh chính | `main` (không push trực tiếp) | |
-| Nhánh phát triển | `develop` (không push trực tiếp) | |
-| Nhánh làm việc | `feature/SCRUM-<số>-<mô-tả-ngắn>` | `feature/SCRUM-6-env-setup` |
-| Commit | `SCRUM-<số>: <việc đã làm>` | `SCRUM-6: add env screenshot` |
-| Pull Request | Tiêu đề `SCRUM-<số>: ...`, nhóm trưởng review rồi merge vào `develop` | |
+## 📋 Yêu cầu hệ thống
+- **Node.js** (phiên bản 18.x trở lên)
+- **Java JDK** (phiên bản 21)
+- **Docker & Docker Compose** (để chạy PostgreSQL và Redis)
+- **Git**
 
-## Quy trình mỗi lần làm việc
-1. `git checkout develop` rồi `git pull`
-2. `git checkout -b feature/SCRUM-<số>-<mô-tả>`
-3. Code, rồi `git add .` và `git commit -m "SCRUM-<số>: ..."`
-4. `git push -u origin feature/SCRUM-<số>-<mô-tả>`
-5. Tạo Pull Request vào `develop`
+## 🚀 Hướng dẫn cài đặt
+
+### Bước 1: Clone dự án
+```bash
+git clone https://github.com/NhomJava1/LAP_TRINH_JAVA.git
+cd LAP_TRINH_JAVA
