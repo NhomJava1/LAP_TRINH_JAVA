@@ -237,6 +237,10 @@ Các hạng mục sau không làm trong MVP, có thể mô tả trong phần hư
 | D-09 | User Manual (Merchant, Admin) | Must | Sprint 8 |
 | D-10 | Tài liệu API (OpenAPI) | Must | Sprint 4 |
 
+**Hoàn thiện D-04:** component diagram, ERD theo mô hình MVP mục tiêu và state diagram
+được lưu dưới dạng PlantUML và PNG tại [`docs/6.Component`](../6.Component/),
+[`docs/7.ERD`](../7.ERD/) và [`docs/8.StateDiagram`](../8.StateDiagram/).
+
 ---
 
 ## 4. Kịch bản demo MVP, khoảng 10 phút

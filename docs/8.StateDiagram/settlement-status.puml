@@ -1,0 +1,32 @@
+@startuml
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam state {
+  BackgroundColor #F7FAFC
+  BorderColor #36566F
+  StartColor #36566F
+  EndColor #36566F
+}
+
+title OctaPoint - settlementStatus
+
+[*] --> PENDING : outbox event committed
+PENDING --> PROCESSING : worker claims eligible event
+PROCESSING --> SETTLED : Sui confirms; digest persisted
+PROCESSING --> PENDING : retryable failure\nschedule backoff
+PROCESSING --> FAILED : permanent failure or retry limit reached
+FAILED --> PENDING : Admin retries after resolution
+
+note right of FAILED
+  No automatic retry.
+  Blocks the customer queue: later events for the same
+  tenant/customer cannot be claimed until manual resolution.
+  Other customers may continue.
+end note
+
+note right of SETTLED
+  Terminal state.
+  Business ledger remains append-only.
+end note
+@enduml
