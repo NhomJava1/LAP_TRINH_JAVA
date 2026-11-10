@@ -1,0 +1,218 @@
+@startuml OctaPoint_Class_Diagram
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam classAttributeIconSize 0
+hide empty members
+title OctaPoint - Class Diagram (domain model v1.0)
+
+note top of Tenant
+  Mô hình domain mục tiêu dựa trên schema V2
+  và yêu cầu hệ thống. Một số class chưa có
+  implementation trong backend hiện tại.
+end note
+
+package "com.octapoint.core.tenant" {
+  class Tenant {
+    id: UUID
+    name: String
+    status: TenantStatus
+    createdAt: Instant
+    updatedAt: Instant
+  }
+  enum TenantStatus {
+    PENDING
+    APPROVED
+    REJECTED
+    SUSPENDED
+  }
+  class TenantService {
+    register()
+    approve()
+    reject()
+    suspend()
+  }
+  class TenantController
+}
+
+package "com.octapoint.core.security" {
+  class AppUser {
+    id: UUID
+    tenantId: UUID
+    email: String
+    passwordHash: String
+    role: UserRole
+  }
+  enum UserRole {
+    ADMIN
+    MERCHANT
+  }
+  class OncePerRequestFilter
+  class HmacFilter {
+    doFilterInternal()
+  }
+  class JwtService {
+    generateToken()
+    validateToken()
+  }
+}
+
+package "com.octapoint.core.apikey" {
+  class ApiKey {
+    keyId: String
+    tenantId: UUID
+    encryptedSecret: String
+    status: KeyStatus
+    scopes: String
+  }
+  enum KeyStatus {
+    ACTIVE
+    REVOKED
+  }
+  class ApiKeyService {
+    createKey()
+    revokeKey()
+    rotateKey()
+    encrypt()
+    decrypt()
+  }
+  class ApiKeyController
+}
+
+package "com.octapoint.core.balance" {
+  class CustomerBalance {
+    tenantId: UUID
+    customerId: String
+    amount: long
+    nextChainSeq: long
+  }
+}
+
+package "com.octapoint.core.ledger" {
+  class LedgerEntry {
+    id: UUID
+    tenantId: UUID
+    customerId: String
+    idempotencyKey: String
+    entryType: EntryType
+    points: long
+    balanceAfter: long
+    chainSeq: long
+  }
+  enum EntryType {
+    ISSUE
+    REDEEM
+  }
+  class TenantRule {
+    id: UUID
+    tenantId: UUID
+    earnVndPerPoint: long
+    redeemValueVndPerPoint: long
+    effectiveFrom: Instant
+  }
+  class IdempotencyRecord {
+    tenantId: UUID
+    idempotencyKey: String
+    requestHash: String
+    responseBody: JsonNode
+    statusCode: int
+  }
+}
+
+package "com.octapoint.core.chain" {
+  interface ChainClient {
+    createAccount()
+    mint()
+    redeem()
+    getAccount()
+  }
+  class MockChainClient
+  class ChainAccount {
+    accountId: String
+    balance: long
+    seq: long
+  }
+  class ChainTransaction {
+    digest: String
+    gasUsed: long
+  }
+  class BalanceChangeRequest
+  class CreateAccountRequest
+}
+
+package "com.octapoint.core.settlement" {
+  class OutboxEvent {
+    id: UUID
+    tenantId: UUID
+    customerId: String
+    eventType: String
+    chainSeq: long
+    status: SettlementStatus
+    settlementMode: SettlementMode
+    attempts: int
+    txDigest: String
+  }
+  enum SettlementStatus {
+    PENDING
+    PROCESSING
+    SETTLED
+    FAILED
+  }
+  enum SettlementMode {
+    LIVE
+    MOCK
+  }
+  class ChainTx {
+    digest: String
+    outboxEventId: UUID
+    gasUsed: long
+  }
+  class SettlementWorker {
+    poll()
+    processBatch()
+    retry()
+  }
+}
+
+package "com.octapoint.core.audit" {
+  class AuditLog {
+    id: UUID
+    tenantId: UUID
+    actorUserId: UUID
+    action: String
+    resourceType: String
+    resourceId: String
+    details: JsonNode
+  }
+  class AuditService {
+    log()
+  }
+}
+
+class CreditService
+
+Tenant "1" -- "0..*" ApiKey
+Tenant "1" -- "0..*" TenantRule
+Tenant "1" -- "0..*" CustomerBalance
+Tenant "1" -- "0..*" AppUser
+Tenant "1" -- "0..*" AuditLog
+CustomerBalance "1" -- "0..*" LedgerEntry
+CustomerBalance "1" -- "0..*" OutboxEvent
+OutboxEvent "1" -- "0..1" ChainTx
+ChainClient <|.. MockChainClient
+HmacFilter --|> OncePerRequestFilter
+TenantController ..> TenantService
+ApiKeyController ..> ApiKeyService
+TenantService ..> Tenant
+ApiKeyService ..> ApiKey
+CreditService ..> ChainClient
+SettlementWorker ..> ChainClient
+SettlementWorker ..> OutboxEvent
+SettlementWorker ..> ChainTx
+AuditService ..> AuditLog
+LedgerEntry ..> EntryType
+OutboxEvent ..> SettlementStatus
+OutboxEvent ..> SettlementMode
+AppUser ..> UserRole
+ApiKey ..> KeyStatus
+Tenant ..> TenantStatus
+@enduml

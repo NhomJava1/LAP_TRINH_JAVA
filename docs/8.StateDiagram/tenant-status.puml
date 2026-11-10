@@ -1,0 +1,37 @@
+@startuml OctaPoint_Tenant_Status
+hide empty description
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam state {
+  BackgroundColor #F7FAFC
+  BorderColor #36566F
+  StartColor #36566F
+  EndColor #36566F
+}
+
+title OctaPoint - Tenant Status
+
+[*] --> PENDING : Merchant đăng ký (UC-01)
+PENDING --> APPROVED : Admin duyệt (UC-04)
+PENDING --> REJECTED : Admin từ chối (UC-04)
+APPROVED --> SUSPENDED : Admin khóa (UC-04)
+SUSPENDED --> APPROVED : Admin mở khóa (UC-04)
+REJECTED --> [*]
+
+note right of PENDING
+  Tenant mới đăng ký.
+  Chưa thể issue/redeem.
+end note
+
+note right of APPROVED
+  Tenant hoạt động bình thường.
+end note
+
+note right of REJECTED
+  Bị từ chối; trạng thái kết thúc.
+end note
+
+note right of SUSPENDED
+  Tạm khóa; không giao dịch được.
+end note
+@enduml

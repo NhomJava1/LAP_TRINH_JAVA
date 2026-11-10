@@ -1,0 +1,116 @@
+@startuml OctaPoint_Redeem_Activity
+skinparam shadowing false
+skinparam defaultFontName Arial
+title OctaPoint - Redeem Activity
+
+|SDK|
+start
+:Nhận yêu cầu redeem\n(customerId, orderId, pointsToRedeem);
+:Tạo Idempotency-Key,\ntimestamp, nonce và HMAC headers;
+
+|HMAC Filter|
+:Kiểm tra rate limit theo IP;
+if (Vượt rate limit?) then (có)
+  :Trả HTTP 429 RATE_LIMITED;
+  |SDK|
+  :Trả lỗi cho Merchant System;
+  stop
+else (không)
+  :Kiểm tra API key, timestamp ±300s\nvà chữ ký HMAC-SHA256;
+endif
+
+if (Thông tin xác thực hợp lệ?) then (không)
+  :Trả HTTP 401 Unauthorized;
+  |SDK|
+  :Trả lỗi xác thực;
+  stop
+else (có)
+endif
+
+|Redis|
+:SETNX nonce với TTL 600s;
+if (Nonce đã tồn tại hoặc Redis lỗi?) then (có)
+  |HMAC Filter|
+  :Trả HTTP 401 NONCE_REUSED\nhoặc lỗi xác thực;
+  |SDK|
+  :Trả lỗi chống replay;
+  stop
+else (không)
+endif
+
+|HMAC Filter|
+:Kiểm tra scope REDEEM;
+if (Thiếu scope?) then (có)
+  :Trả HTTP 403 FORBIDDEN_SCOPE;
+  |SDK|
+  :Trả lỗi quyền hạn;
+  stop
+else (không)
+endif
+
+|Core Service|
+:Kiểm tra tenant APPROVED;
+if (Tenant chưa được duyệt/đang khóa?) then (có)
+  :Trả HTTP 403 TENANT_NOT_APPROVED;
+  |SDK|
+  :Trả lỗi tenant;
+  stop
+else (không)
+endif
+
+|PostgreSQL|
+:Kiểm tra customer thuộc tenant;
+if (Customer không tồn tại?) then (có)
+  |Core Service|
+  :Trả HTTP 404 NOT_FOUND;
+  |SDK|
+  :Trả lỗi không tìm thấy customer;
+  stop
+else (không)
+endif
+
+|PostgreSQL|
+:Tra cứu Idempotency-Key\nvà request hash;
+if (Key đã tồn tại?) then (có)
+  if (Hash giống nhau?) then (có)
+    :Đọc response đã lưu;
+    |Core Service|
+    :Trả lại kết quả cũ;
+    |SDK|
+    :Nhận HTTP 200 (idempotent replay);
+    stop
+  else (không)
+    |Core Service|
+    :Trả HTTP 409 IDEMPOTENCY_CONFLICT;
+    |SDK|
+    :Nhận lỗi xung đột;
+    stop
+  endif
+else (chưa)
+endif
+
+|Core Service|
+:Bắt đầu transaction redeem;
+|PostgreSQL|
+:UPDATE balance\nSET amount = amount - points\nWHERE amount >= points;
+if (Không cập nhật được dòng nào?) then (không đủ điểm)
+  :ROLLBACK; không ghi ledger/outbox;
+  |Core Service|
+  :Trả HTTP 422 INSUFFICIENT_BALANCE;
+  |SDK|
+  :Trả lỗi không đủ số dư;
+  stop
+else (đủ điểm)
+  :Ghi ledger_entry REDEEM;
+  :Ghi outbox_event PENDING\nvà idempotency response;
+  :COMMIT transaction;
+endif
+
+|Core Service|
+:Tạo kết quả nghiệp vụ;
+|HMAC Filter|
+:Trả HTTP 200 OK\n{pointsRedeemed, balanceAfter,\nsettlementStatus: PENDING};
+|SDK|
+:Trả kết quả redeem cho Merchant System;
+stop
+@enduml
