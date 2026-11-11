@@ -4,7 +4,7 @@ skinparam componentStyle rectangle
 skinparam shadowing false
 skinparam defaultFontName Arial
 
-title OctaPoint - Component Diagram (MVP Chuẩn Kiến Trúc)
+title OctaPoint - Component Diagram (Gateway, Core, Worker, Signer)
 
 actor "Merchant System\n(POS / e-commerce)" as Merchant
 actor "Merchant / Admin" as PortalUser
@@ -17,6 +17,7 @@ package "Client Tier" {
 }
 
 package "OctaPoint Core (Spring Boot)" {
+  component "API Gateway" as Gateway
   component "Security / JWT Filter" as JwtFilter
   component "Security / HMAC Filter" as HmacFilter
   
@@ -39,11 +40,12 @@ PortalUser --> MerchantPortal
 PortalUser --> AdminPortal
 Merchant --> SDK
 
-MerchantPortal --> JwtFilter
-AdminPortal --> JwtFilter
+MerchantPortal --> Gateway
+AdminPortal --> Gateway
+SDK --> Gateway
+Gateway --> JwtFilter
+Gateway --> HmacFilter
 JwtFilter --> PortalApi
-
-SDK --> HmacFilter
 HmacFilter --> CreditApi
 
 ' Luồng xử lý Portal nội bộ
