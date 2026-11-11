@@ -4,11 +4,16 @@ server:
 spring:
   application:
     name: octapoint-core
-  
+
   datasource:
-    url: jdbc:h2:mem:octapoint_db
-    username: sa
-    password: ''
+    url: jdbc:postgresql://localhost:5432/octapoint_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
 
   data:
     redis:
@@ -22,8 +27,15 @@ spring:
 
   h2:
     console:
-      enabled: true
-      path: /h2-console
+      enabled: false
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  packages-to-scan: com.octapoint.core
 
 management:
   endpoints:
