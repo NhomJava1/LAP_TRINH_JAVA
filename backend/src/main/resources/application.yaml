@@ -4,26 +4,31 @@ server:
 spring:
   application:
     name: octapoint-core
-  
-  datasource:
-    url: jdbc:h2:mem:octapoint_db
-    username: sa
-    password: ''
 
+  # Cấu hình kết nối PostgreSQL (Docker)
+  datasource:
+    url: jdbc:postgresql://postgres:5432/octapoint_db
+    username: postgres
+    password: secretpassword
+    driver-class-name: org.postgresql.Driver
+
+  # Cấu hình Redis
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: redis
+      port: 6379
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+  # TẮT FLYWAY ĐỂ TRÁNH LỖI KHỞI ĐỘNG
+  flyway:
+    enabled: false
 
 management:
   endpoints:
