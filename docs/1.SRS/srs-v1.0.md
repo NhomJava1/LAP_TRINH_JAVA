@@ -177,8 +177,8 @@ End-user/khách tích điểm không tương tác trực tiếp trong MVP; họ 
 | Mức | Phạm vi |
 |---|---|
 | **Must** | FR-01 đến FR-15; NFR-01 đến NFR-05; các chức năng core, Portal, SDK và settlement |
-| **Should** | FR-17, FR-18, FR-19, FR-27, FR-28, FR-29; MCP, rule nâng cao, analytics, gas quota, webhook, đối soát |
-| **Could** | FR-20, FR-22, FR-23, FR-25, FR-26, FR-30, FR-31, FR-32, FR-33 |
+| **Should** | FR-17, FR-18, FR-19, FR-27, FR-28, FR-29, FR-33; MCP, rule nâng cao, analytics, gas quota, webhook, đối soát, retry FAILED |
+| **Could** | FR-20, FR-22, FR-23, FR-25, FR-26, FR-30, FR-31, FR-32 |
 | **Won't** | FR-16, FR-21, FR-24; Sui Mainnet, Stripe thật, production uptime 99,9%, mTLS thực tế và các mục được nêu tại mục 9 |
 
 ### 2.5. Môi trường vận hành
@@ -244,7 +244,7 @@ Portal phải cung cấp:
 - Audit log gồm actor, action, đối tượng, thời điểm, kết quả và correlation ID.
 - Thông tin health/metric cơ bản của hệ thống.
 
-Retry thủ công giao dịch `FAILED` là FR-33, thuộc Could; MVP bắt buộc hiển thị giao dịch lỗi theo FR-13 nhưng không bắt buộc nút retry thủ công.
+Retry thủ công giao dịch `FAILED` là FR-33, thuộc Should (được nâng từ Could theo SCRUM-97/Q5); MVP bắt buộc hiển thị giao dịch lỗi theo FR-13 nhưng không bắt buộc nút retry thủ công ở tầng A1.
 
 ### 3.2. Giao diện API REST
 
@@ -512,7 +512,7 @@ RETURNING amount, next_chain_seq - 1 AS chain_seq;
 12. Kết quả timeout/không rõ phải được kiểm tra on-chain trước khi gửi lại.
 13. `settlementMode = MOCK` chỉ dùng cho MockChainClient; không được gán digest cũ cho giao dịch mock mới.
 
-**Head-of-line blocking:** Một event `FAILED` hoặc đang xử lý chặn các event có `chain_seq` lớn hơn của cùng `(tenant, customer)` cho đến khi event trước được xử lý/đối soát. Các customer khác vẫn có thể được worker xử lý độc lập. FR-13 yêu cầu Admin xem giao dịch `FAILED`; retry thủ công là FR-33 (Could), không phải cam kết phục hồi tự động trong MVP.
+**Head-of-line blocking:** Một event `FAILED` hoặc đang xử lý chặn các event có `chain_seq` lớn hơn của cùng `(tenant, customer)` cho đến khi event trước được xử lý/đối soát. Các customer khác vẫn có thể được worker xử lý độc lập. FR-13 yêu cầu Admin xem giao dịch `FAILED`; retry thủ công là FR-33 (Should theo SCRUM-97/Q5), không phải cam kết phục hồi tự động trong MVP A1.
 
 ### 4.10. FR-10 — Smart contract Sui Move
 
@@ -579,7 +579,7 @@ Admin Portal phải hỗ trợ:
 - Xem danh sách FAILED kèm nguyên nhân.
 - Xem audit log cơ bản.
 
-Nút retry thủ công là FR-33, không bắt buộc trong MVP.
+Nút retry thủ công là FR-33 (Should theo SCRUM-97/Q5), không bắt buộc trong MVP tầng A1.
 
 ### 4.14. FR-14 — Security Gateway
 
@@ -667,7 +667,7 @@ Các yêu cầu sau được ghi nhận để bảo đảm không bỏ sót mã 
 4. Ledger không được sửa/xóa.
 5. Worker phải retry lỗi với backoff và bảo toàn thứ tự theo customer.
 6. Timeout chain phải được đối chiếu trước retry để hạn chế duplicate.
-7. Khi event của một customer bị `FAILED` hoặc chưa được giải quyết, các event sau của chính customer đó phải chờ (head-of-line blocking); event của customer khác không bị chặn bởi event này. Admin phải có thể phát hiện/đối soát trạng thái lỗi. Retry thủ công là FR-33 (Could), không nằm trong cam kết bắt buộc của MVP.
+7. Khi event của một customer bị `FAILED` hoặc chưa được giải quyết, các event sau của chính customer đó phải chờ (head-of-line blocking); event của customer khác không bị chặn bởi event này. Admin phải có thể phát hiện/đối soát trạng thái lỗi. Retry thủ công là FR-33 (Should theo SCRUM-97/Q5), không nằm trong cam kết bắt buộc của MVP tầng A1.
 
 ### 5.4. NFR-04 — CI/CD và chất lượng mã nguồn
 
@@ -910,7 +910,7 @@ Danh mục dưới đây giữ nguyên mã, actor, mức ưu tiên và liên k�
 | UC-28 | Nhận webhook khi SETTLED | Merchant System | Should | FR-28 |
 | UC-29 | Đối soát DB và chain | System Admin, Sui Blockchain | Should | FR-29 |
 | UC-30 | Quản lý nhân viên (STAFF) | Merchant | Could | FR-31 |
-| UC-31 | Retry thủ công settlement FAILED | System Admin | Could | FR-33 |
+| UC-31 | Retry thủ công settlement FAILED | System Admin | Should | FR-33 |
 | UC-32 | Neo hash sổ cái lên Sui | System Admin, Sui Blockchain | Could | FR-30 |
 | UC-33 | MCP tool ghi (có xác nhận) | AI Agent | Could | FR-32 |
 
@@ -1037,7 +1037,7 @@ Mọi use case Portal trừ UC-01 yêu cầu đăng nhập (UC-02). Các UC mứ
 | FR-30 | Could | — | UC-32 |
 | FR-31 | Could | — | UC-30 |
 | FR-32 | Could | — | UC-33 |
-| FR-33 | Could | — | UC-31 |
+| FR-33 | Should | — | UC-31 |
 
 UR mappings follow the current URD and Use Case v1 traceability tables. `—` means the source does not define a UR/UC link (or the requirement is Won't); no link is inferred. FR-20, FR-22, FR-23, FR-25 and FR-26 are Could requirements with no dedicated UC in the current Use Case v1.
 
