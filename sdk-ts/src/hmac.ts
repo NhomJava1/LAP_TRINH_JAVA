@@ -103,3 +103,32 @@ export function signRequest(input: SignRequestInput): SignedHeaders {
     'X-OP-Signature': signature,
   };
 }
+
+export interface VerifyWebhookSignatureInput {
+  webhookSecret: string;
+  timestamp: string;
+  rawBody: string | Buffer;
+  signature: string;
+  toleranceSeconds?: number;
+  nowSeconds?: number;
+}
+
+export function verifyWebhookSignature(input: VerifyWebhookSignatureInput): boolean {
+  const ts = Number(input.timestamp);
+  if (!Number.isFinite(ts)) {
+    return false;
+  }
+  const now = input.nowSeconds ?? Math.floor(Date.now() / 1000);
+  const tolerance = input.toleranceSeconds ?? 300;
+  if (Math.abs(now - ts) > tolerance) {
+    return false;
+  }
+  const bodyStr = typeof input.rawBody === 'string' ? input.rawBody : input.rawBody.toString('utf8');
+  const expected = hmacSha256Hex(input.webhookSecret, `${input.timestamp}.${bodyStr}`);
+  const actualBuf = Buffer.from(input.signature, 'utf8');
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  if (actualBuf.length !== expectedBuf.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(actualBuf, expectedBuf);
+}

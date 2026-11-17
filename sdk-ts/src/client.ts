@@ -67,6 +67,14 @@ export class OctaPointClient {
     return this.request('GET', '/api/merchant/v1/credits/history', query);
   }
 
+  async rules() {
+    return this.request('GET', '/api/merchant/v1/credits/rules');
+  }
+
+  async summary() {
+    return this.request('GET', '/api/merchant/v1/credits/summary');
+  }
+
   buildSignedHeaders(
     method: string,
     path: string,
