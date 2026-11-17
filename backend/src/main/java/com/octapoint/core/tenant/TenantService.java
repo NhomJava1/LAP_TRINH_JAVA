@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class TenantService {
@@ -17,6 +18,8 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final TenantRuleRepository tenantRuleRepository;
+    private final ConcurrentHashMap<String, Tenant> tenantCache = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, TenantRule> ruleCache = new ConcurrentHashMap<>();
 
     public TenantService(TenantRepository tenantRepository, TenantRuleRepository tenantRuleRepository) {
         this.tenantRepository = tenantRepository;
@@ -51,25 +54,31 @@ public class TenantService {
         defaultRule.setTenantId(saved.getId());
         defaultRule.setEarnVndPerPoint(1000L);
         defaultRule.setRedeemValueVndPerPoint(10L);
-        tenantRuleRepository.save(defaultRule);
+        TenantRule savedRule = tenantRuleRepository.save(defaultRule);
 
+        tenantCache.put(saved.getId(), saved);
+        ruleCache.put(saved.getId(), savedRule);
         return saved;
     }
 
     @Transactional
     public Tenant updateStatus(String tenantId, TenantStatus newStatus) {
-        Tenant tenant = getTenant(tenantId);
+        Tenant tenant = loadTenantFromDb(tenantId);
         tenant.setStatus(newStatus.name());
-        return tenantRepository.save(tenant);
+        Tenant saved = tenantRepository.save(tenant);
+        tenantCache.put(saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
     public Tenant addGasUsed(String tenantId, long gasMist) {
-        Tenant tenant = getTenant(tenantId);
+        Tenant tenant = loadTenantFromDb(tenantId);
         if (gasMist > 0) {
             long current = tenant.getGasUsedMist() != null ? tenant.getGasUsedMist() : 0L;
             tenant.setGasUsedMist(current + gasMist);
-            return tenantRepository.save(tenant);
+            Tenant saved = tenantRepository.save(tenant);
+            tenantCache.put(saved.getId(), saved);
+            return saved;
         }
         return tenant;
     }
@@ -79,14 +88,16 @@ public class TenantService {
         if (newQuotaMist < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_GAS_QUOTA", "gasQuotaMist must be >= 0");
         }
-        Tenant tenant = getTenant(tenantId);
+        Tenant tenant = loadTenantFromDb(tenantId);
         tenant.setGasQuotaMist(newQuotaMist);
-        return tenantRepository.save(tenant);
+        Tenant saved = tenantRepository.save(tenant);
+        tenantCache.put(saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
     public Tenant updateWebhook(String tenantId, String webhookUrl, String webhookSecret) {
-        Tenant tenant = getTenant(tenantId);
+        Tenant tenant = loadTenantFromDb(tenantId);
         if (webhookUrl != null && !webhookUrl.isBlank()) {
             String trimmed = webhookUrl.trim();
             if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
@@ -102,7 +113,9 @@ public class TenantService {
             tenant.setWebhookUrl(null);
             tenant.setWebhookSecret(null);
         }
-        return tenantRepository.save(tenant);
+        Tenant saved = tenantRepository.save(tenant);
+        tenantCache.put(saved.getId(), saved);
+        return saved;
     }
 
     @Transactional
@@ -111,12 +124,24 @@ public class TenantService {
         if (!ALLOWED_PLANS.contains(normalized)) {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_PLAN", "Allowed plans: STARTER, GROWTH, ENTERPRISE");
         }
-        Tenant tenant = getTenant(tenantId);
+        Tenant tenant = loadTenantFromDb(tenantId);
         tenant.setSubscriptionPlan(normalized);
-        return tenantRepository.save(tenant);
+        Tenant saved = tenantRepository.save(tenant);
+        tenantCache.put(saved.getId(), saved);
+        return saved;
     }
 
     public Tenant getTenant(String tenantId) {
+        Tenant cached = tenantCache.get(tenantId);
+        if (cached != null) {
+            return cached;
+        }
+        Tenant loaded = loadTenantFromDb(tenantId);
+        tenantCache.put(tenantId, loaded);
+        return loaded;
+    }
+
+    private Tenant loadTenantFromDb(String tenantId) {
         return tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND.value(), "TENANT_NOT_FOUND", "Tenant not found: " + tenantId));
     }
@@ -135,8 +160,12 @@ public class TenantService {
 
     @Transactional
     public TenantRule getOrCreateRule(String tenantId) {
-        return tenantRuleRepository.findByTenantId(tenantId).orElseGet(() -> {
-            getTenant(tenantId);
+        TenantRule cached = ruleCache.get(tenantId);
+        if (cached != null) {
+            return cached;
+        }
+        TenantRule loaded = tenantRuleRepository.findByTenantId(tenantId).orElseGet(() -> {
+            loadTenantFromDb(tenantId);
             TenantRule rule = new TenantRule();
             rule.setId("rule_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
             rule.setTenantId(tenantId);
@@ -144,6 +173,8 @@ public class TenantService {
             rule.setRedeemValueVndPerPoint(10L);
             return tenantRuleRepository.save(rule);
         });
+        ruleCache.put(tenantId, loaded);
+        return loaded;
     }
 
     @Transactional
@@ -183,7 +214,13 @@ public class TenantService {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_MULTIPLIER", "Tier multipliers must be >= 1.0 and gold >= silver");
         }
 
-        TenantRule rule = getOrCreateRule(tenantId);
+        TenantRule rule = tenantRuleRepository.findByTenantId(tenantId).orElseGet(() -> {
+            loadTenantFromDb(tenantId);
+            TenantRule r = new TenantRule();
+            r.setId("rule_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+            r.setTenantId(tenantId);
+            return r;
+        });
         rule.setEarnVndPerPoint(earnVndPerPoint);
         rule.setRedeemValueVndPerPoint(redeemValueVndPerPoint);
         rule.setPointExpiryDays(pointExpiryDays);
@@ -191,6 +228,8 @@ public class TenantService {
         rule.setGoldThresholdPoints(goldThresholdPoints);
         rule.setSilverMultiplier(silverMultiplier);
         rule.setGoldMultiplier(goldMultiplier);
-        return tenantRuleRepository.save(rule);
+        TenantRule saved = tenantRuleRepository.save(rule);
+        ruleCache.put(tenantId, saved);
+        return saved;
     }
 }

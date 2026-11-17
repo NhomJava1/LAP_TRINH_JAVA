@@ -1,16 +1,21 @@
 package com.octapoint.core.audit;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import org.springframework.data.domain.Persistable;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "audit_logs")
-public class AuditLog {
+public class AuditLog implements Persistable<String> {
 
     @Id
     @Column(length = 64)
@@ -46,6 +51,15 @@ public class AuditLog {
     @Column(name = "created_at")
     private Instant createdAt;
 
+    @Transient
+    private boolean newEntity = true;
+
+    @PostLoad
+    @PostPersist
+    void markPersisted() {
+        this.newEntity = false;
+    }
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
@@ -53,6 +67,13 @@ public class AuditLog {
         }
     }
 
+    @Override
+    @JsonIgnore
+    public boolean isNew() {
+        return newEntity;
+    }
+
+    @Override
     public String getId() {
         return id;
     }

@@ -1,5 +1,6 @@
 package com.octapoint.core.audit;
 
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,33 @@ public class AuditService {
             String result,
             String details,
             String correlationId) {
+        auditLogRepository.save(buildEntry(tenantId, actor, actorRole, action, targetType, targetId, result, details, correlationId));
+    }
+
+    @Async
+    public void logAsync(
+            String tenantId,
+            String actor,
+            String actorRole,
+            String action,
+            String targetType,
+            String targetId,
+            String result,
+            String details,
+            String correlationId) {
+        auditLogRepository.save(buildEntry(tenantId, actor, actorRole, action, targetType, targetId, result, details, correlationId));
+    }
+
+    private AuditLog buildEntry(
+            String tenantId,
+            String actor,
+            String actorRole,
+            String action,
+            String targetType,
+            String targetId,
+            String result,
+            String details,
+            String correlationId) {
         AuditLog entry = new AuditLog();
         entry.setId("aud_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
         entry.setTenantId(tenantId);
@@ -38,7 +66,7 @@ public class AuditService {
         entry.setResult(result);
         entry.setDetails(details);
         entry.setCorrelationId(correlationId != null ? correlationId : UUID.randomUUID().toString());
-        auditLogRepository.save(entry);
+        return entry;
     }
 
     public List<AuditLog> listAllRecent() {

@@ -25,6 +25,12 @@ spring:
       enabled: true
       path: /h2-console
 
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 8
+
 management:
   endpoints:
     web:
@@ -39,6 +45,7 @@ app:
     default-admin-email: ${DEFAULT_ADMIN_EMAIL:admin@octapoint.io}
     default-admin-password: ${DEFAULT_ADMIN_PASSWORD:admin123}
     nonce-store: ${NONCE_STORE:redis}
+    rate-limit-capacity: ${RATE_LIMIT_CAPACITY:120}
   settlement:
     mode: ${SETTLEMENT_MODE:LIVE}
     worker-enabled: ${SETTLEMENT_WORKER_ENABLED:true}

@@ -49,7 +49,7 @@ public class MerchantCreditController {
 
         Map<String, Object> result = ledgerService.issue(
                 auth.tenantId(), customerId, orderId, amountVnd, idempotencyKey, auth.keyId());
-        auditService.log(auth.tenantId(), auth.keyId(), "API_KEY", "CREDIT_ISSUE", "CUSTOMER", customerId,
+        auditService.logAsync(auth.tenantId(), auth.keyId(), "API_KEY", "CREDIT_ISSUE", "CUSTOMER", customerId,
                 "SUCCESS", "Issued " + result.get("pointsIssued") + " points (seq=" + result.get("chainSeq") + ")",
                 String.valueOf(result.get("transactionId")));
         return ResponseEntity.ok(result);
@@ -68,7 +68,7 @@ public class MerchantCreditController {
         try {
             Map<String, Object> result = ledgerService.redeem(
                     auth.tenantId(), customerId, orderId, pointsToRedeem, idempotencyKey, auth.keyId());
-            auditService.log(auth.tenantId(), auth.keyId(), "API_KEY", "CREDIT_REDEEM", "CUSTOMER", customerId,
+            auditService.logAsync(auth.tenantId(), auth.keyId(), "API_KEY", "CREDIT_REDEEM", "CUSTOMER", customerId,
                     "SUCCESS", "Redeemed " + pointsToRedeem + " points (seq=" + result.get("chainSeq") + ")",
                     String.valueOf(result.get("transactionId")));
             return ResponseEntity.ok(result);

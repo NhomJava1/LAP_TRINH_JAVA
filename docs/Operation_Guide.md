@@ -122,5 +122,20 @@ npm run demo
   docker run --rm -v sui-config:/root/.sui -v "${PWD}:/workspace" -w /workspace/contracts/octapoint_move lap_trinh_java-sui-cli move test
   ```
 - **Frontend:** `cd frontend && npm run lint && npm run build`
+- **Load Test hiệu năng `NFR-01` (20 VU × 1.000 request/endpoint, yêu cầu Docker stack đang chạy):**
+  ```powershell
+  cd sdk-ts
+  npm run benchmark
+  ```
 
-Xem thêm kiến trúc định hướng cho các hạng mục `Won't` (`FR-16` zkLogin/Enoki, `FR-21` Walrus + Seal, `FR-24` ClickHouse CDC, mTLS/KMS, Mainnet checklist) tại [Future_Work_Architecture.md](./Future_Work_Architecture.md).
+---
+
+## 7. Danh mục Tài liệu Hệ thống (Task Package 5)
+
+| Tài liệu | Nội dung |
+|---|---|
+| [SDK_and_MCP_Guide.md](./SDK_and_MCP_Guide.md) | Hướng dẫn HMAC ADR-0003, TypeScript SDK, Java 21 SDK và MCP Server (`FR-17`, `FR-32`) |
+| [Database_and_Move_Specification.md](./Database_and_Move_Specification.md) | Đặc tả PostgreSQL Flyway `V1`–`V5` và Move Smart Contract `octapoint.move` |
+| [Test_Plan_and_Report.md](./Test_Plan_and_Report.md) | Kế hoạch kiểm thử, ma trận xác minh FR/NFR và báo cáo Load Test `NFR-01` |
+| [User_Manual.md](./User_Manual.md) | Hướng dẫn sử dụng Portal cho Merchant Owner, Staff và System Admin |
+| [Future_Work_Architecture.md](./Future_Work_Architecture.md) | Kiến trúc định hướng `v2.0` (`FR-16` zkLogin/Enoki, `FR-21` Walrus/Seal, `FR-24` ClickHouse CDC, Mainnet) |

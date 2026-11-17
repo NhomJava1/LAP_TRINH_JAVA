@@ -97,13 +97,7 @@ public class LedgerService {
         String scopedIdemKey = tenant.getId() + ":ISSUE:" + idempotencyKey.trim();
         String requestHash = HmacCodec.sha256Hex("ISSUE|" + cleanCustomerId + "|" + cleanOrderId + "|" + amountVnd);
 
-        Optional<IdempotencyRecord> quickCheck = idempotencyRecordRepository.findById(scopedIdemKey);
-        if (quickCheck.isPresent()) {
-            return handleExistingIdempotency(quickCheck.get(), requestHash);
-        }
-
         String compositeId = compositeCustomerId(tenant.getId(), cleanCustomerId);
-        customerEnsureService.ensureExists(compositeId, tenant.getId(), cleanCustomerId);
 
         IssueTxOutcome outcome = transactionTemplate.execute(status -> {
             Optional<IdempotencyRecord> existingIdem = idempotencyRecordRepository.findById(scopedIdemKey);
@@ -118,8 +112,11 @@ public class LedgerService {
                         "Order amount does not yield at least 1 point under current rule");
             }
 
-            Customer customer = customerRepository.findByIdForUpdate(compositeId)
-                    .orElseThrow(() -> new IllegalStateException("Customer row missing after ensureExists"));
+            Customer customer = customerRepository.findByIdForUpdate(compositeId).orElseGet(() -> {
+                customerEnsureService.ensureExists(compositeId, tenant.getId(), cleanCustomerId);
+                return customerRepository.findByIdForUpdate(compositeId)
+                        .orElseThrow(() -> new IllegalStateException("Customer row missing after ensureExists"));
+            });
 
             long lifetime = customer.getLifetimeEarnedPoints() != null ? customer.getLifetimeEarnedPoints() : 0L;
             String tier = resolveTier(lifetime, rule);

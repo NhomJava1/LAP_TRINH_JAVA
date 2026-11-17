@@ -19,6 +19,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ApiKeyService {
@@ -32,6 +33,7 @@ public class ApiKeyService {
     private String masterKey;
 
     private final ApiKeyRepository apiKeyRepository;
+    private final ConcurrentHashMap<String, ResolvedApiKey> activeKeyCache = new ConcurrentHashMap<>();
 
     public ApiKeyService(ApiKeyRepository apiKeyRepository) {
         this.apiKeyRepository = apiKeyRepository;
@@ -149,6 +151,7 @@ public class ApiKeyService {
         existing.setStatus("REVOKED");
         existing.setRevokedAt(Instant.now());
         apiKeyRepository.save(existing);
+        activeKeyCache.remove(keyId);
 
         return createApiKey(tenantId, existing.getName(), existing.getScopes());
     }
@@ -161,7 +164,9 @@ public class ApiKeyService {
         if (existing.getRevokedAt() == null) {
             existing.setRevokedAt(Instant.now());
         }
-        return apiKeyRepository.save(existing);
+        ApiKeyEntity saved = apiKeyRepository.save(existing);
+        activeKeyCache.remove(keyId);
+        return saved;
     }
 
     public List<ApiKeyEntity> listByTenant(String tenantId) {
@@ -173,7 +178,11 @@ public class ApiKeyService {
     }
 
     public Optional<ResolvedApiKey> resolveActiveKey(String keyId) {
-        return apiKeyRepository.findById(keyId)
+        ResolvedApiKey cached = activeKeyCache.get(keyId);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        Optional<ResolvedApiKey> loaded = apiKeyRepository.findById(keyId)
                 .filter(k -> "ACTIVE".equals(k.getStatus()))
                 .filter(k -> k.getEncryptedSecret() != null && k.getSecretIv() != null)
                 .map(k -> {
@@ -184,6 +193,8 @@ public class ApiKeyService {
                         throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR.value(), "KEY_DECRYPTION_FAILED", "Failed to decrypt API key");
                     }
                 });
+        loaded.ifPresent(resolved -> activeKeyCache.put(keyId, resolved));
+        return loaded;
     }
 
     public record CreatedApiKey(
