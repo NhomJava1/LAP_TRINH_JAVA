@@ -1,15 +1,53 @@
 openapi: 3.0.3
 info:
-  title: OctaPoint Mock API
-  description: Mock server cho dự án Credit-as-a-Service
-  version: 1.0.0
+  title: OctaPoint Core API
+  description: Hệ thống API lõi cho dự án Credit-as-a-Service (Đồng bộ theo Requirement v0.2)
+  version: 1.1.0
 servers:
   - url: http://localhost:8080
+    description: Local Development Server
+
 paths:
+  # ==================== 1. MERCHANT & API KEY (FR-01, FR-03) ====================
+  /api/v1/merchants/register:
+    post:
+      summary: Đăng ký tài khoản Merchant mới (FR-01)
+      operationId: registerMerchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MerchantRegisterRequest'
+      responses:
+        '201':
+          description: Đăng ký thành công, trả về trạng thái PENDING
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantResponse'
+
+  /api/v1/merchants/api-keys:
+    post:
+      summary: Tạo API Key mới cho Merchant (FR-03)
+      operationId: createApiKey
+      security:
+        - BearerAuth: []
+      responses:
+        '201':
+          description: Tạo thành công (Secret chỉ hiển thị 1 lần)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+
+  # ==================== 2. CREDIT TRANSACTIONS (FR-05, FR-06) ====================
   /api/v1/credits/balance:
     get:
-      summary: Lấy số dư credit của khách hàng
+      summary: Lấy số dư credit của khách hàng (FR-07)
       operationId: getCreditBalance
+      security:
+        - ApiKeyAuth: []
       parameters:
         - name: customerId
           in: query
@@ -23,10 +61,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CreditBalance'
+
   /api/v1/credits/issue:
     post:
-      summary: Cấp điểm (Issue) cho khách hàng
+      summary: Cấp điểm (Issue) cho khách hàng (FR-05)
       operationId: issueCredit
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Mã chống trùng lặp giao dịch
       requestBody:
         required: true
         content:
@@ -40,8 +88,79 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IssueResponse'
+        '409':
+          description: Xung đột Idempotency Key (Payload khác với request cũ)
+
+  /api/v1/credits/redeem:
+    post:
+      summary: Đổi điểm (Redeem) của khách hàng (FR-06)
+      operationId: redeemCredit
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemRequest'
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemResponse'
+        '400':
+          description: Số dư không đủ
+
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
   schemas:
+    # --- Merchant Schemas ---
+    MerchantRegisterRequest:
+      type: object
+      required:
+        - businessName
+        - email
+        - phone
+      properties:
+        businessName:
+          type: string
+          example: "Siêu thị A"
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          
+    MerchantResponse:
+      type: object
+      properties:
+        merchantId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, LOCKED]
+          
+    ApiKeyResponse:
+      type: object
+      properties:
+        apiKey:
+          type: string
+        apiSecret:
+          type: string
+          description: Chỉ hiển thị duy nhất 1 lần khi tạo
+
+    # --- Credit Schemas ---
     CreditBalance:
       type: object
       properties:
@@ -51,19 +170,49 @@ components:
           type: integer
         settlementStatus:
           type: string
+          enum: [PENDING, SETTLED, FAILED]
+
     IssueRequest:
       type: object
+      required:
+        - customerId
+        - amountVnd
       properties:
         customerId:
           type: string
         amountVnd:
           type: integer
+          description: Số tiền VND (phải > 0)
+
     IssueResponse:
       type: object
       properties:
         transactionId:
           type: string
         pointsIssued:
+          type: integer
+        status:
+          type: string
+
+    RedeemRequest:
+      type: object
+      required:
+        - customerId
+        - pointsToRedeem
+      properties:
+        customerId:
+          type: string
+        pointsToRedeem:
+          type: integer
+
+    RedeemResponse:
+      type: object
+      properties:
+        transactionId:
+          type: string
+        pointsRedeemed:
+          type: integer
+        remainingBalance:
           type: integer
         status:
           type: string
