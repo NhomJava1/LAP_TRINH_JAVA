@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
+import { useAuthStore } from '@/store/autoStore';
 
 interface ApiKeyItem {
   id: string;
@@ -18,8 +19,10 @@ interface CreatedApiKey extends ApiKeyItem {
 }
 
 export default function ApiKeysPage() {
+  const { role } = useAuthStore();
   const [keys, setKeys] = useState<ApiKeyItem[]>([]);
   const [newKeyName, setNewKeyName] = useState('');
+  const [scopes, setScopes] = useState<'ISSUE,REDEEM,READ' | 'READ'>('ISSUE,REDEEM,READ');
   const [createdSecret, setCreatedSecret] = useState<CreatedApiKey | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +42,9 @@ export default function ApiKeysPage() {
   };
 
   useEffect(() => {
+    if (role === 'STAFF') {
+      return;
+    }
     let active = true;
     apiFetch<ApiKeyItem[]>('/api/portal/api-keys')
       .then((data) => {
@@ -53,7 +59,7 @@ export default function ApiKeysPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [role]);
 
   const handleCreateKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +68,7 @@ export default function ApiKeysPage() {
     try {
       const created = await apiFetch<CreatedApiKey>('/api/portal/api-keys', {
         method: 'POST',
-        body: JSON.stringify({ name: newKeyName || 'Merchant Key' }),
+        body: JSON.stringify({ name: newKeyName || 'Merchant Key', scopes }),
       });
       setCreatedSecret(created);
       setNewKeyName('');
@@ -122,22 +128,36 @@ export default function ApiKeysPage() {
         </div>
       )}
 
-      <form onSubmit={handleCreateKey} className="bg-white p-4 rounded-xl border border-slate-200 flex gap-3 items-center">
-        <input
-          type="text"
-          value={newKeyName}
-          onChange={(e) => setNewKeyName(e.target.value)}
-          placeholder="Tên API Key (ví dụ: POS Quầy 1)"
-          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-60"
-        >
-          + Tạo API Key mới
-        </button>
-      </form>
+      {role === 'STAFF' ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+          Tài khoản <strong>STAFF</strong> chỉ có quyền xem dữ liệu vận hành. Chỉ chủ sở hữu Merchant mới được tạo, xoay vòng hoặc thu hồi API Key.
+        </div>
+      ) : (
+        <>
+          <form onSubmit={handleCreateKey} className="bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap gap-3 items-center">
+            <input
+              type="text"
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="Tên API Key (ví dụ: POS Quầy 1 hoặc MCP Read-Only)"
+              className="flex-1 min-w-[220px] px-3 py-2 border border-slate-300 rounded-lg text-sm"
+            />
+            <select
+              value={scopes}
+              onChange={(e) => setScopes(e.target.value as 'ISSUE,REDEEM,READ' | 'READ')}
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+            >
+              <option value="ISSUE,REDEEM,READ">ISSUE,REDEEM,READ (POS / Full SDK)</option>
+              <option value="READ">READ Only (AI Assistant / MCP)</option>
+            </select>
+            <button
+              type="submit"
+              disabled={busy}
+              className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-60"
+            >
+              + Tạo API Key mới
+            </button>
+          </form>
 
       {createdSecret && (
         <div className="bg-amber-50 border border-amber-300 p-5 rounded-xl space-y-3">
@@ -265,6 +285,8 @@ export default function ApiKeysPage() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
     </div>
   );
 }

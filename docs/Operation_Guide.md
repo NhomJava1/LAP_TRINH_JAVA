@@ -64,15 +64,23 @@ Mở trình duyệt tại http://localhost:3000.
 | **7** | Merchant | Mở `/merchant/history`, bấm **Làm mới trạng thái** | Thấy số dư `70`, lịch sử `ISSUE` & `REDEEM` chuyển từ `PENDING` → `SETTLED` |
 | **8** | Cả nhóm | Bấm vào link `txDigest` trên giao diện | Mở Sui Testnet Explorer hiển thị transaction thực tế |
 | **9** | Admin | Mở `/admin` và `/admin/audit-logs` | Thấy tổng số tenant, giao dịch, trạng thái settlement & lịch sử bảo mật |
+| **10** | AI / MCP | Tạo API Key scope `READ` tại `/merchant/api-keys`, chạy `cd mcp-server && npm run demo` | AI Assistant truy vấn được số dư/lịch sử/rule qua MCP; lệnh ghi bằng key `READ` bị chặn `403 INSUFFICIENT_SCOPE` |
 
 ---
 
-## 5. Chạy kịch bản Demo tự động bằng TypeScript SDK
+## 5. Chạy kịch bản Demo tự động bằng TypeScript SDK & MCP Server
 
-Sau khi chạy Docker Compose (`postgres`, `redis`, `signer`, `core`), bạn có thể chạy toàn bộ 9 bước qua CLI:
+Sau khi chạy Docker Compose (`postgres`, `redis`, `signer`, `core`), bạn có thể chạy toàn bộ 9 bước + Bước 10 qua CLI:
 
 ```powershell
 cd sdk-ts
+npm install
+npm run demo
+```
+
+Chạy demo Bước 10 (AI Assistant qua MCP Server read-only `FR-17`):
+```powershell
+cd mcp-server
 npm install
 npm run demo
 ```
@@ -84,18 +92,35 @@ $env:API_SECRET="sec_..."
 npm run demo
 ```
 
+### Tính năng mở rộng Should & Could trên Portal & Admin
+- **Merchant Portal**:
+  - `/merchant/analytics`: Thống kê tích/đổi điểm theo ngày (`FR-19`) & cảnh báo gian lận (`FR-22`).
+  - `/merchant/rule-config`: Hạn sử dụng điểm & hệ số nhân hạng Silver / Gold (`FR-18`).
+  - `/merchant/history`: Kết nối realtime Server-Sent Events (`/api/portal/events/stream`, `FR-23`).
+  - `/merchant/settings`: Cấu hình HMAC Webhook (`FR-28`), tài khoản `STAFF` chỉ đọc (`FR-31`), gói cước SaaS & hóa đơn tạm tính (`FR-20`).
+- **Admin Portal**:
+  - `/admin`: Xem Micrometer metrics (`NFR-06`), chạy **Đối soát On-Chain vs DB** (`POST /api/admin/reconcile`, `FR-29`) và **Neo Hash Ledger lên Sui** (`POST /api/admin/anchors`, `FR-30`).
+  - `/admin/tenants`: Điều chỉnh **Gas Quota (MIST)** cho từng tenant và tự động mở khóa các event `PAUSED_GAS_QUOTA` (`FR-27`).
+
 ---
 
 ## 6. Chạy kiểm thử tự động (CI & Local)
 
-- **Backend (Unit + ArchUnit + Integration + NFR-03 Concurrency):**
+- **Backend (Unit + ArchUnit + Integration + Should/Could + NFR-03 Concurrency):**
   ```powershell
   docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn --batch-mode verify
   ```
-- **TypeScript SDK:** `cd sdk-ts && npm test && npm run build`
-- **Sui Signer:** `cd signer && npm test && npm run build`
+- **Java 21 SDK (`FR-25`):**
+  ```powershell
+  docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/sdk-java:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn --batch-mode test
+  ```
+- **TypeScript SDK (`FR-26`, `FR-28`):** `cd sdk-ts && npm test && npm run build`
+- **MCP Server (`FR-17`, `FR-32`):** `cd mcp-server && npm test && npm run build`
+- **Sui Signer (`FR-26`, `FR-29`, `FR-30`):** `cd signer && npm test && npm run build`
 - **Move Contract:**
   ```powershell
   docker run --rm -v sui-config:/root/.sui -v "${PWD}:/workspace" -w /workspace/contracts/octapoint_move lap_trinh_java-sui-cli move test
   ```
-- **Frontend:** `cd frontend && npm run build && npm run lint`
+- **Frontend:** `cd frontend && npm run lint && npm run build`
+
+Xem thêm kiến trúc định hướng cho các hạng mục `Won't` (`FR-16` zkLogin/Enoki, `FR-21` Walrus + Seal, `FR-24` ClickHouse CDC, mTLS/KMS, Mainnet checklist) tại [Future_Work_Architecture.md](./Future_Work_Architecture.md).

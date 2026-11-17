@@ -8,7 +8,7 @@ import { useAuthStore } from '@/store/autoStore';
 
 interface LoginResponse {
   token: string;
-  role: 'MERCHANT' | 'ADMIN';
+  role: 'MERCHANT' | 'ADMIN' | 'STAFF';
   email: string;
   name: string;
   tenantId: string | null;

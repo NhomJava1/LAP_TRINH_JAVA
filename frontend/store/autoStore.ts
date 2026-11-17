@@ -13,7 +13,7 @@ export interface AuthProfile {
 
 interface AuthState {
   token: string | null;
-  role: 'MERCHANT' | 'ADMIN' | null;
+  role: 'MERCHANT' | 'ADMIN' | 'STAFF' | null;
   email: string | null;
   name: string | null;
   tenantId: string | null;
@@ -21,7 +21,7 @@ interface AuthState {
   tenantStatus: string | null;
   hasHydrated: boolean;
   setHasHydrated: (value: boolean) => void;
-  login: (token: string, role: 'MERCHANT' | 'ADMIN', profile?: AuthProfile) => void;
+  login: (token: string, role: 'MERCHANT' | 'ADMIN' | 'STAFF', profile?: AuthProfile) => void;
   updateTenantStatus: (status: string) => void;
   logout: () => void;
 }

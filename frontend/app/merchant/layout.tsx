@@ -17,11 +17,11 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
     );
   }
 
-  if (role !== 'MERCHANT') {
+  if (role !== 'MERCHANT' && role !== 'STAFF') {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-4 bg-slate-50 p-6 text-center">
         <p className="text-lg font-semibold text-red-600">
-          Vui lòng đăng nhập bằng tài khoản Merchant để truy cập cổng này.
+          Vui lòng đăng nhập bằng tài khoản Merchant hoặc Staff để truy cập cổng này.
         </p>
         <Link
           href="/login"
@@ -34,11 +34,13 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
   }
 
   const navItems = [
-    { href: '/merchant', label: 'Tổng quan' },
-    { href: '/merchant/api-keys', label: 'Quản lý API Key' },
-    { href: '/merchant/rule-config', label: 'Cấu hình Rule' },
-    { href: '/merchant/history', label: 'Lịch sử & Số dư' },
-  ];
+    { href: '/merchant', label: 'Tổng quan', ownerOnly: false },
+    { href: '/merchant/analytics', label: 'Phân tích & Cảnh báo', ownerOnly: false },
+    { href: '/merchant/history', label: 'Lịch sử & Số dư', ownerOnly: false },
+    { href: '/merchant/api-keys', label: 'Quản lý API Key', ownerOnly: true },
+    { href: '/merchant/rule-config', label: 'Cấu hình Rule & Hạng', ownerOnly: true },
+    { href: '/merchant/settings', label: 'Webhook, Staff & Billing', ownerOnly: true },
+  ].filter((item) => role === 'MERCHANT' || !item.ownerOnly);
 
   const handleLogout = () => {
     logout();
@@ -52,19 +54,26 @@ export default function MerchantLayout({ children }: { children: React.ReactNode
           <div className="mb-6">
             <div className="font-bold text-xl text-slate-900">OctaPoint Merchant</div>
             <div className="text-xs text-slate-500 mt-1 truncate">{tenantName || email}</div>
-            {tenantStatus && (
-              <span
-                className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-semibold ${
-                  tenantStatus === 'APPROVED'
-                    ? 'bg-emerald-100 text-emerald-700'
-                    : tenantStatus === 'PENDING'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-red-100 text-red-700'
-                }`}
-              >
-                {tenantStatus}
-              </span>
-            )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {tenantStatus && (
+                <span
+                  className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                    tenantStatus === 'APPROVED'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : tenantStatus === 'PENDING'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-red-100 text-red-700'
+                  }`}
+                >
+                  {tenantStatus}
+                </span>
+              )}
+              {role === 'STAFF' && (
+                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-slate-200 text-slate-700">
+                  STAFF (Read-Only)
+                </span>
+              )}
+            </div>
           </div>
 
           <nav className="flex flex-col gap-1.5">

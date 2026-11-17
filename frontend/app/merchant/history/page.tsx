@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
+import { API_BASE, apiFetch } from '@/lib/api';
+import { useAuthStore } from '@/store/autoStore';
 
 interface TransactionItem {
   transactionId: string;
@@ -11,8 +12,10 @@ interface TransactionItem {
   points: number;
   amountVnd: number | null;
   orderId: string | null;
+  appliedTier?: string | null;
+  expiresAt?: string | null;
   chainSeq: number | null;
-  settlementStatus: 'PENDING' | 'SETTLED' | 'FAILED';
+  settlementStatus: 'PENDING' | 'SETTLED' | 'FAILED' | 'PAUSED_GAS_QUOTA';
   settlementMode: string;
   txDigest: string | null;
   lastError: string | null;
@@ -28,13 +31,15 @@ interface CustomerBalanceItem {
 }
 
 export default function MerchantHistoryPage() {
+  const { token } = useAuthStore();
   const [customerFilter, setCustomerFilter] = useState('');
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [customers, setCustomers] = useState<CustomerBalanceItem[]>([]);
+  const [sseConnected, setSseConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async (filter = customerFilter) => {
+  const loadData = useCallback(async (filter: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -50,7 +55,7 @@ export default function MerchantHistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -70,10 +75,40 @@ export default function MerchantHistoryPage() {
       .finally(() => {
         if (active) setLoading(false);
       });
+
+    if (!token) {
+      return () => {
+        active = false;
+      };
+    }
+
+    const es = new EventSource(`${API_BASE}/api/portal/events/stream?token=${encodeURIComponent(token)}`);
+    es.onopen = () => {
+      if (active) setSseConnected(true);
+    };
+    es.onerror = () => {
+      if (active) setSseConnected(false);
+    };
+    es.addEventListener('settlement-update', () => {
+      if (!active) return;
+      Promise.all([
+        apiFetch<TransactionItem[]>('/api/portal/transactions'),
+        apiFetch<CustomerBalanceItem[]>('/api/portal/customers'),
+      ])
+        .then(([txData, custData]) => {
+          if (active) {
+            setTransactions(txData);
+            setCustomers(custData);
+          }
+        })
+        .catch(() => {});
+    });
+
     return () => {
       active = false;
+      es.close();
     };
-  }, []);
+  }, [token]);
 
   const handleFilterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,12 +124,23 @@ export default function MerchantHistoryPage() {
             Theo dõi sổ cái PostgreSQL bất biến và liên kết kiểm chứng Sui Testnet Explorer.
           </p>
         </div>
-        <button
-          onClick={() => loadData(customerFilter)}
-          className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50"
-        >
-          Làm mới trạng thái
-        </button>
+        <div className="flex items-center gap-3">
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+              sseConnected
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-slate-200 text-slate-600'
+            }`}
+          >
+            {sseConnected ? '● Live SSE Connected' : '○ SSE Offline'}
+          </span>
+          <button
+            onClick={() => loadData(customerFilter)}
+            className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-medium hover:bg-slate-50"
+          >
+            Làm mới trạng thái
+          </button>
+        </div>
       </div>
 
       {error && (

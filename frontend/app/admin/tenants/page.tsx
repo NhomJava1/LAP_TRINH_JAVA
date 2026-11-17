@@ -9,11 +9,15 @@ interface TenantItem {
   email: string | null;
   phone: string | null;
   status: string;
+  gasQuotaMist: number | null;
+  gasUsedMist: number | null;
+  subscriptionPlan: string | null;
   createdAt: string | null;
 }
 
 export default function AdminTenantManagementPage() {
   const [tenants, setTenants] = useState<TenantItem[]>([]);
+  const [quotaInputs, setQuotaInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -64,6 +68,28 @@ export default function AdminTenantManagementPage() {
     }
   };
 
+  const updateGasQuota = async (id: string, fallbackQuota: number) => {
+    const raw = quotaInputs[id];
+    const parsed = raw ? Number(raw) : fallbackQuota;
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setError('Gas quota phải >= 0');
+      return;
+    }
+    setBusyId(id);
+    setError(null);
+    try {
+      await apiFetch(`/api/admin/tenants/${id}/gas-quota`, {
+        method: 'PATCH',
+        body: JSON.stringify({ gasQuotaMist: parsed }),
+      });
+      await loadTenants();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cập nhật gas quota thất bại');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -93,8 +119,8 @@ export default function AdminTenantManagementPage() {
             <tr>
               <th className="p-4 font-semibold">Mã Tenant</th>
               <th className="p-4 font-semibold">Tên Doanh nghiệp</th>
-              <th className="p-4 font-semibold">Email / SĐT</th>
-              <th className="p-4 font-semibold">Ngày đăng ký</th>
+              <th className="p-4 font-semibold">Email / Gói</th>
+              <th className="p-4 font-semibold">Gas Quota (MIST)</th>
               <th className="p-4 font-semibold">Trạng thái</th>
               <th className="p-4 font-semibold text-right">Thao tác</th>
             </tr>
@@ -119,10 +145,32 @@ export default function AdminTenantManagementPage() {
                   <td className="p-4 font-semibold text-slate-900">{t.name}</td>
                   <td className="p-4 text-slate-600">
                     <div>{t.email || '-'}</div>
-                    {t.phone && <div className="text-xs text-slate-400">{t.phone}</div>}
+                    <div className="text-xs text-slate-400">
+                      {t.subscriptionPlan || 'STARTER'} • {t.phone || '-'}
+                    </div>
                   </td>
-                  <td className="p-4 text-xs text-slate-500">
-                    {t.createdAt ? new Date(t.createdAt).toLocaleString('vi-VN') : '-'}
+                  <td className="p-4 text-xs text-slate-600 space-y-1">
+                    <div className="font-mono">
+                      {(t.gasUsedMist ?? 0).toLocaleString()} / {(t.gasQuotaMist ?? 0).toLocaleString()}
+                    </div>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={String(t.gasQuotaMist ?? 10000000000)}
+                        value={quotaInputs[t.id] ?? ''}
+                        onChange={(e) => setQuotaInputs((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                        className="w-28 px-2 py-1 border border-slate-300 rounded text-xs font-mono"
+                      />
+                      <button
+                        type="button"
+                        disabled={busyId === t.id}
+                        onClick={() => updateGasQuota(t.id, t.gasQuotaMist ?? 10000000000)}
+                        className="px-2 py-1 rounded bg-slate-800 text-white text-xs hover:bg-slate-700"
+                      >
+                        Set
+                      </button>
+                    </div>
                   </td>
                   <td className="p-4">
                     <span
