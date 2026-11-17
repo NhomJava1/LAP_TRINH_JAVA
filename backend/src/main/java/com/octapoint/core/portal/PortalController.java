@@ -1,18 +1,25 @@
 package com.octapoint.core.portal;
 
+import com.octapoint.core.anomaly.AnomalyService;
 import com.octapoint.core.apikey.ApiKeyEntity;
 import com.octapoint.core.apikey.ApiKeyService;
 import com.octapoint.core.audit.AuditService;
 import com.octapoint.core.ledger.LedgerService;
+import com.octapoint.core.realtime.SseHub;
+import com.octapoint.core.security.AppUser;
+import com.octapoint.core.security.AppUserRepository;
 import com.octapoint.core.security.PortalPrincipal;
 import com.octapoint.core.shared.ApiException;
 import com.octapoint.core.tenant.Tenant;
 import com.octapoint.core.tenant.TenantRule;
 import com.octapoint.core.tenant.TenantService;
 import com.octapoint.core.tenant.TenantStatus;
+import com.octapoint.core.webhook.WebhookService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,10 +27,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 public class PortalController {
@@ -32,21 +43,36 @@ public class PortalController {
     private final ApiKeyService apiKeyService;
     private final LedgerService ledgerService;
     private final AuditService auditService;
+    private final AnomalyService anomalyService;
+    private final WebhookService webhookService;
+    private final SseHub sseHub;
+    private final AppUserRepository appUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public PortalController(
             TenantService tenantService,
             ApiKeyService apiKeyService,
             LedgerService ledgerService,
-            AuditService auditService) {
+            AuditService auditService,
+            AnomalyService anomalyService,
+            WebhookService webhookService,
+            SseHub sseHub,
+            AppUserRepository appUserRepository,
+            PasswordEncoder passwordEncoder) {
         this.tenantService = tenantService;
         this.apiKeyService = apiKeyService;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
+        this.anomalyService = anomalyService;
+        this.webhookService = webhookService;
+        this.sseHub = sseHub;
+        this.appUserRepository = appUserRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @GetMapping("/api/portal/dashboard")
     public ResponseEntity<Map<String, Object>> dashboard(HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requirePortalPrincipal(request);
         Tenant tenant = tenantService.getTenant(principal.tenantId());
         TenantRule rule = tenantService.getOrCreateRule(tenant.getId());
         Map<String, Object> stats = ledgerService.getTenantDashboardStats(tenant.getId());
@@ -56,12 +82,13 @@ public class PortalController {
         response.put("rule", toRuleDto(rule));
         response.put("stats", stats);
         response.put("activeApiKeys", apiKeyService.countActiveByTenant(tenant.getId()));
+        response.put("role", principal.role());
         return ResponseEntity.ok(response);
     }
 
     @GetMapping({"/api/portal/api-keys", "/api/v1/merchants/api-keys"})
     public ResponseEntity<List<Map<String, Object>>> listApiKeys(HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requireMerchantOwner(request);
         List<Map<String, Object>> items = apiKeyService.listByTenant(principal.tenantId()).stream()
                 .map(this::toSafeApiKeyDto)
                 .toList();
@@ -72,13 +99,14 @@ public class PortalController {
     public ResponseEntity<Map<String, Object>> createApiKey(
             @RequestBody(required = false) Map<String, String> body,
             HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requireMerchantOwner(request);
         Tenant tenant = requireApprovedTenant(principal.tenantId());
         String keyName = body != null ? body.get("name") : null;
+        String scopes = body != null ? body.get("scopes") : null;
 
-        ApiKeyService.CreatedApiKey created = apiKeyService.createApiKey(tenant.getId(), keyName);
+        ApiKeyService.CreatedApiKey created = apiKeyService.createApiKey(tenant.getId(), keyName, scopes);
         auditService.log(tenant.getId(), principal.email(), "MERCHANT", "API_KEY_CREATED",
-                "API_KEY", created.id(), "SUCCESS", "Created API key " + created.name(), null);
+                "API_KEY", created.id(), "SUCCESS", "Created API key " + created.name() + " scopes=" + created.scopes(), null);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toCreatedApiKeyDto(created));
     }
@@ -87,7 +115,7 @@ public class PortalController {
     public ResponseEntity<Map<String, Object>> rotateApiKey(
             @PathVariable String keyId,
             HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requireMerchantOwner(request);
         Tenant tenant = requireApprovedTenant(principal.tenantId());
 
         ApiKeyService.CreatedApiKey rotated = apiKeyService.rotateApiKey(tenant.getId(), keyId);
@@ -101,7 +129,7 @@ public class PortalController {
     public ResponseEntity<Map<String, Object>> revokeApiKey(
             @PathVariable String keyId,
             HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requireMerchantOwner(request);
         ApiKeyEntity revoked = apiKeyService.revokeApiKey(principal.tenantId(), keyId);
         auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "API_KEY_REVOKED",
                 "API_KEY", revoked.getId(), "SUCCESS", "Revoked API key", null);
@@ -111,7 +139,7 @@ public class PortalController {
 
     @GetMapping("/api/portal/rules")
     public ResponseEntity<Map<String, Object>> getRules(HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requirePortalPrincipal(request);
         TenantRule rule = tenantService.getOrCreateRule(principal.tenantId());
         return ResponseEntity.ok(toRuleDto(rule));
     }
@@ -120,14 +148,43 @@ public class PortalController {
     public ResponseEntity<Map<String, Object>> updateRules(
             @RequestBody Map<String, Object> body,
             HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requireMerchantOwner(request);
+        TenantRule current = tenantService.getOrCreateRule(principal.tenantId());
         long earnRate = parsePositiveLong(body.get("earnVndPerPoint"), "earnVndPerPoint");
         long redeemRate = parsePositiveLong(body.get("redeemValueVndPerPoint"), "redeemValueVndPerPoint");
 
-        TenantRule updated = tenantService.updateRule(principal.tenantId(), earnRate, redeemRate);
+        int expiryDays = body.get("pointExpiryDays") instanceof Number n
+                ? n.intValue()
+                : current.getPointExpiryDays();
+        long silverThreshold = body.get("silverThresholdPoints") instanceof Number n
+                ? n.longValue()
+                : current.getSilverThresholdPoints();
+        long goldThreshold = body.get("goldThresholdPoints") instanceof Number n
+                ? n.longValue()
+                : current.getGoldThresholdPoints();
+        BigDecimal silverMult = body.get("silverMultiplier") != null
+                ? new BigDecimal(String.valueOf(body.get("silverMultiplier")))
+                : current.getSilverMultiplier();
+        BigDecimal goldMult = body.get("goldMultiplier") != null
+                ? new BigDecimal(String.valueOf(body.get("goldMultiplier")))
+                : current.getGoldMultiplier();
+
+        TenantRule updated = tenantService.updateAdvancedRule(
+                principal.tenantId(),
+                earnRate,
+                redeemRate,
+                expiryDays,
+                silverThreshold,
+                goldThreshold,
+                silverMult,
+                goldMult
+        );
         auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "RULE_UPDATED",
                 "TENANT_RULE", updated.getId(), "SUCCESS",
-                "earnVndPerPoint=" + earnRate + ", redeemValueVndPerPoint=" + redeemRate, null);
+                "earnVndPerPoint=" + earnRate + ", redeemValueVndPerPoint=" + redeemRate
+                        + ", silver=" + silverMult + "x@" + silverThreshold
+                        + ", gold=" + goldMult + "x@" + goldThreshold,
+                null);
 
         return ResponseEntity.ok(toRuleDto(updated));
     }
@@ -136,20 +193,180 @@ public class PortalController {
     public ResponseEntity<List<Map<String, Object>>> listTransactions(
             @RequestParam(required = false) String customerId,
             HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requirePortalPrincipal(request);
         return ResponseEntity.ok(ledgerService.getHistory(principal.tenantId(), customerId));
     }
 
     @GetMapping("/api/portal/customers")
     public ResponseEntity<List<Map<String, Object>>> listCustomers(HttpServletRequest request) {
-        PortalPrincipal principal = requireMerchantPrincipal(request);
+        PortalPrincipal principal = requirePortalPrincipal(request);
         return ResponseEntity.ok(ledgerService.listCustomers(principal.tenantId()));
     }
 
-    private PortalPrincipal requireMerchantPrincipal(HttpServletRequest request) {
+    @GetMapping("/api/portal/analytics")
+    public ResponseEntity<Map<String, Object>> analytics(HttpServletRequest request) {
+        PortalPrincipal principal = requirePortalPrincipal(request);
+        return ResponseEntity.ok(ledgerService.getTenantAnalytics(principal.tenantId()));
+    }
+
+    @GetMapping("/api/portal/anomalies")
+    public ResponseEntity<?> anomalies(HttpServletRequest request) {
+        PortalPrincipal principal = requirePortalPrincipal(request);
+        return ResponseEntity.ok(anomalyService.listByTenant(principal.tenantId()));
+    }
+
+    @GetMapping(path = "/api/portal/events/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamEvents(HttpServletRequest request) {
+        PortalPrincipal principal = requirePortalPrincipal(request);
+        return sseHub.subscribe(principal.tenantId());
+    }
+
+    @GetMapping("/api/portal/webhook")
+    public ResponseEntity<Map<String, Object>> getWebhook(HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        Tenant tenant = tenantService.getTenant(principal.tenantId());
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("webhookUrl", tenant.getWebhookUrl());
+        map.put("hasSecret", tenant.getWebhookSecret() != null && !tenant.getWebhookSecret().isBlank());
+        return ResponseEntity.ok(map);
+    }
+
+    @PutMapping("/api/portal/webhook")
+    public ResponseEntity<Map<String, Object>> updateWebhook(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        Tenant updated = tenantService.updateWebhook(
+                principal.tenantId(), body.get("webhookUrl"), body.get("webhookSecret"));
+        auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "WEBHOOK_UPDATED",
+                "TENANT", updated.getId(), "SUCCESS", "url=" + updated.getWebhookUrl(), null);
+
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("webhookUrl", updated.getWebhookUrl());
+        map.put("webhookSecret", updated.getWebhookSecret());
+        return ResponseEntity.ok(map);
+    }
+
+    @GetMapping("/api/portal/webhook/deliveries")
+    public ResponseEntity<?> webhookDeliveries(HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        return ResponseEntity.ok(webhookService.listByTenant(principal.tenantId()));
+    }
+
+    @PostMapping("/api/portal/webhook/test")
+    public ResponseEntity<?> testWebhook(HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        return ResponseEntity.ok(webhookService.sendTestWebhook(principal.tenantId()));
+    }
+
+    @GetMapping("/api/portal/staff")
+    public ResponseEntity<List<Map<String, Object>>> listStaff(HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        List<Map<String, Object>> list = appUserRepository.findByTenantIdOrderByCreatedAtDesc(principal.tenantId()).stream()
+                .map(u -> {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("id", u.getId());
+                    row.put("name", u.getName());
+                    row.put("email", u.getEmail());
+                    row.put("role", u.getRole());
+                    row.put("createdAt", u.getCreatedAt() != null ? u.getCreatedAt().toString() : null);
+                    return row;
+                }).toList();
+        return ResponseEntity.ok(list);
+    }
+
+    @PostMapping("/api/portal/staff")
+    public ResponseEntity<Map<String, Object>> createStaff(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        String name = body.get("name");
+        String email = body.get("email");
+        String password = body.get("password");
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_STAFF_INPUT", "email and password are required");
+        }
+        String normalizedEmail = email.trim().toLowerCase();
+        if (appUserRepository.findByEmail(normalizedEmail).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT.value(), "EMAIL_ALREADY_EXISTS", "Email already registered");
+        }
+
+        AppUser staff = new AppUser();
+        staff.setId("usr_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        staff.setTenantId(principal.tenantId());
+        staff.setName((name != null && !name.isBlank()) ? name.trim() : normalizedEmail);
+        staff.setEmail(normalizedEmail);
+        staff.setPasswordHash(passwordEncoder.encode(password));
+        staff.setRole("STAFF");
+        AppUser saved = appUserRepository.save(staff);
+
+        auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "STAFF_CREATED",
+                "USER", saved.getId(), "SUCCESS", "Created STAFF user " + saved.getEmail(), null);
+
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", saved.getId());
+        row.put("name", saved.getName());
+        row.put("email", saved.getEmail());
+        row.put("role", saved.getRole());
+        row.put("createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : null);
+        return ResponseEntity.status(HttpStatus.CREATED).body(row);
+    }
+
+    @GetMapping("/api/portal/billing")
+    public ResponseEntity<Map<String, Object>> getBilling(HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        Tenant tenant = tenantService.getTenant(principal.tenantId());
+        Map<String, Object> stats = ledgerService.getTenantDashboardStats(tenant.getId());
+        long txCount = ((Number) stats.getOrDefault("totalIssuedPoints", 0L)).longValue() > 0
+                ? ledgerService.getHistory(tenant.getId(), null).size()
+                : 0L;
+
+        String plan = tenant.getSubscriptionPlan() != null ? tenant.getSubscriptionPlan() : "STARTER";
+        long baseFeeVnd = switch (plan) {
+            case "ENTERPRISE" -> 4_990_000L;
+            case "GROWTH" -> 1_490_000L;
+            default -> 0L;
+        };
+        long perTxFeeVnd = txCount * 500L;
+        long totalEstimatedVnd = baseFeeVnd + perTxFeeVnd;
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("plan", plan);
+        res.put("gasQuotaMist", tenant.getGasQuotaMist());
+        res.put("gasUsedMist", tenant.getGasUsedMist());
+        res.put("monthlyTransactions", txCount);
+        res.put("baseFeeVnd", baseFeeVnd);
+        res.put("usageFeeVnd", perTxFeeVnd);
+        res.put("totalInvoiceVnd", totalEstimatedVnd);
+        res.put("invoicePeriod", Instant.now().toString().substring(0, 7));
+        res.put("billingMode", "SIMULATED");
+        return ResponseEntity.ok(res);
+    }
+
+    @PutMapping("/api/portal/billing/plan")
+    public ResponseEntity<Map<String, Object>> updatePlan(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        PortalPrincipal principal = requireMerchantOwner(request);
+        Tenant updated = tenantService.updateSubscriptionPlan(principal.tenantId(), body.get("plan"));
+        auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "PLAN_UPDATED",
+                "TENANT", updated.getId(), "SUCCESS", "plan=" + updated.getSubscriptionPlan(), null);
+        return ResponseEntity.ok(Map.of("plan", updated.getSubscriptionPlan()));
+    }
+
+    private PortalPrincipal requirePortalPrincipal(HttpServletRequest request) {
         Object attr = request.getAttribute(PortalPrincipal.REQUEST_ATTR);
         if (!(attr instanceof PortalPrincipal principal) || principal.tenantId() == null) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED", "Merchant authentication required");
+            throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED", "Portal authentication required");
+        }
+        return principal;
+    }
+
+    private PortalPrincipal requireMerchantOwner(HttpServletRequest request) {
+        PortalPrincipal principal = requirePortalPrincipal(request);
+        if (!"MERCHANT".equals(principal.role())) {
+            throw new ApiException(HttpStatus.FORBIDDEN.value(), "FORBIDDEN_MERCHANT_OWNER_ONLY",
+                    "Only MERCHANT owner can perform this action (current role=" + principal.role() + ")");
         }
         return principal;
     }
@@ -177,6 +394,9 @@ public class PortalController {
         map.put("email", tenant.getEmail());
         map.put("phone", tenant.getPhone());
         map.put("status", tenant.getStatus());
+        map.put("gasQuotaMist", tenant.getGasQuotaMist());
+        map.put("gasUsedMist", tenant.getGasUsedMist());
+        map.put("subscriptionPlan", tenant.getSubscriptionPlan());
         map.put("createdAt", tenant.getCreatedAt() != null ? tenant.getCreatedAt().toString() : null);
         return map;
     }
@@ -187,6 +407,11 @@ public class PortalController {
         map.put("tenantId", rule.getTenantId());
         map.put("earnVndPerPoint", rule.getEarnVndPerPoint());
         map.put("redeemValueVndPerPoint", rule.getRedeemValueVndPerPoint());
+        map.put("pointExpiryDays", rule.getPointExpiryDays());
+        map.put("silverThresholdPoints", rule.getSilverThresholdPoints());
+        map.put("goldThresholdPoints", rule.getGoldThresholdPoints());
+        map.put("silverMultiplier", rule.getSilverMultiplier());
+        map.put("goldMultiplier", rule.getGoldMultiplier());
         map.put("updatedAt", rule.getUpdatedAt() != null ? rule.getUpdatedAt().toString() : null);
         return map;
     }

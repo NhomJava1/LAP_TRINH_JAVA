@@ -1,10 +1,14 @@
 package com.octapoint.core.admin;
 
+import com.octapoint.core.anchor.AnchorService;
+import com.octapoint.core.anomaly.AnomalyService;
 import com.octapoint.core.audit.AuditLog;
 import com.octapoint.core.audit.AuditService;
 import com.octapoint.core.ledger.LedgerService;
+import com.octapoint.core.metrics.OctaPointMetrics;
 import com.octapoint.core.outbox.OutboxEvent;
 import com.octapoint.core.outbox.OutboxSettlementWorker;
+import com.octapoint.core.reconcile.ReconciliationService;
 import com.octapoint.core.security.PortalPrincipal;
 import com.octapoint.core.shared.ApiException;
 import com.octapoint.core.tenant.Tenant;
@@ -35,6 +39,10 @@ public class AdminController {
     private final LedgerService ledgerService;
     private final OutboxSettlementWorker outboxSettlementWorker;
     private final AuditService auditService;
+    private final ReconciliationService reconciliationService;
+    private final AnchorService anchorService;
+    private final AnomalyService anomalyService;
+    private final OctaPointMetrics metrics;
     private final String settlementMode;
 
     public AdminController(
@@ -42,11 +50,19 @@ public class AdminController {
             LedgerService ledgerService,
             OutboxSettlementWorker outboxSettlementWorker,
             AuditService auditService,
+            ReconciliationService reconciliationService,
+            AnchorService anchorService,
+            AnomalyService anomalyService,
+            OctaPointMetrics metrics,
             @Value("${app.settlement.mode:LIVE}") String settlementMode) {
         this.tenantService = tenantService;
         this.ledgerService = ledgerService;
         this.outboxSettlementWorker = outboxSettlementWorker;
         this.auditService = auditService;
+        this.reconciliationService = reconciliationService;
+        this.anchorService = anchorService;
+        this.anomalyService = anomalyService;
+        this.metrics = metrics;
         this.settlementMode = settlementMode != null ? settlementMode.toUpperCase() : "MOCK";
     }
 
@@ -62,6 +78,7 @@ public class AdminController {
         stats.put("pendingSettlements", outboxSettlementWorker.countByStatus("PENDING"));
         stats.put("settledSettlements", outboxSettlementWorker.countByStatus("SETTLED"));
         stats.put("failedSettlements", outboxSettlementWorker.countByStatus("FAILED"));
+        stats.put("pausedGasSettlements", outboxSettlementWorker.countByStatus("PAUSED_GAS_QUOTA"));
         stats.put("settlementMode", settlementMode);
         return ResponseEntity.ok(stats);
     }
@@ -99,6 +116,28 @@ public class AdminController {
         return ResponseEntity.ok(toTenantDto(updated));
     }
 
+    @PatchMapping("/api/admin/tenants/{id}/gas-quota")
+    public ResponseEntity<Map<String, Object>> updateGasQuota(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request) {
+        PortalPrincipal admin = requireAdminPrincipal(request);
+        Object rawQuota = body.get("gasQuotaMist");
+        if (!(rawQuota instanceof Number num) || num.longValue() < 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_GAS_QUOTA", "gasQuotaMist must be >= 0");
+        }
+        Tenant updated = tenantService.updateGasQuota(id, num.longValue());
+        int resumed = outboxSettlementWorker.resumePausedGasEvents(id);
+
+        auditService.log(updated.getId(), admin.email(), "ADMIN", "TENANT_GAS_QUOTA_UPDATED",
+                "TENANT", updated.getId(), "SUCCESS",
+                "gasQuotaMist=" + updated.getGasQuotaMist() + ", resumedEvents=" + resumed, null);
+
+        Map<String, Object> res = toTenantDto(updated);
+        res.put("resumedEvents", resumed);
+        return ResponseEntity.ok(res);
+    }
+
     @GetMapping("/api/admin/settlements")
     public ResponseEntity<List<Map<String, Object>>> listSettlements(
             @RequestParam(required = false) String status) {
@@ -122,6 +161,43 @@ public class AdminController {
         return ResponseEntity.ok(auditService.listAllRecent());
     }
 
+    @GetMapping("/api/admin/analytics")
+    public ResponseEntity<Map<String, Object>> analytics() {
+        return ResponseEntity.ok(ledgerService.getGlobalAnalytics());
+    }
+
+    @GetMapping("/api/admin/metrics-summary")
+    public ResponseEntity<Map<String, Object>> metricsSummary() {
+        return ResponseEntity.ok(metrics.summary());
+    }
+
+    @GetMapping("/api/admin/anomalies")
+    public ResponseEntity<?> anomalies() {
+        return ResponseEntity.ok(anomalyService.listAll());
+    }
+
+    @PostMapping("/api/admin/reconcile")
+    public ResponseEntity<?> runReconciliation(HttpServletRequest request) {
+        PortalPrincipal admin = requireAdminPrincipal(request);
+        return ResponseEntity.ok(reconciliationService.runReconciliation(admin.email()));
+    }
+
+    @GetMapping("/api/admin/reconcile/reports")
+    public ResponseEntity<?> listReconciliationReports() {
+        return ResponseEntity.ok(reconciliationService.listRecent());
+    }
+
+    @PostMapping("/api/admin/anchors")
+    public ResponseEntity<?> createAnchor(HttpServletRequest request) {
+        PortalPrincipal admin = requireAdminPrincipal(request);
+        return ResponseEntity.ok(anchorService.anchorCurrentLedger(admin.email()));
+    }
+
+    @GetMapping("/api/admin/anchors")
+    public ResponseEntity<?> listAnchors() {
+        return ResponseEntity.ok(anchorService.listRecent());
+    }
+
     private PortalPrincipal requireAdminPrincipal(HttpServletRequest request) {
         Object attr = request.getAttribute(PortalPrincipal.REQUEST_ATTR);
         if (!(attr instanceof PortalPrincipal principal) || !"ADMIN".equals(principal.role())) {
@@ -137,6 +213,10 @@ public class AdminController {
         map.put("email", t.getEmail());
         map.put("phone", t.getPhone());
         map.put("status", t.getStatus());
+        map.put("gasQuotaMist", t.getGasQuotaMist());
+        map.put("gasUsedMist", t.getGasUsedMist());
+        map.put("subscriptionPlan", t.getSubscriptionPlan());
+        map.put("webhookUrl", t.getWebhookUrl());
         map.put("createdAt", t.getCreatedAt() != null ? t.getCreatedAt().toString() : null);
         map.put("updatedAt", t.getUpdatedAt() != null ? t.getUpdatedAt().toString() : null);
         return map;
@@ -152,6 +232,7 @@ public class AdminController {
         map.put("status", evt.getStatus());
         map.put("settlementMode", evt.getSettlementMode());
         map.put("chainSeq", evt.getChainSeq());
+        map.put("gasUsedMist", evt.getGasUsedMist());
         map.put("txDigest", evt.getTxDigest());
         map.put("retryCount", evt.getRetryCount());
         map.put("lastError", evt.getLastError());

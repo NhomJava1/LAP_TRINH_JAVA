@@ -10,6 +10,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -36,12 +37,61 @@ public class SignerChainClient implements ChainClient {
 
     @Override
     public ChainTransaction mint(BalanceChangeRequest request) {
-        return invokeSigner("/internal/issue", request);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", request.amount().longValueExact());
+        body.put("accountId", request.accountId());
+        return postSignerTx("/internal/issue", body);
+    }
+
+    @Override
+    public ChainTransaction mintBatch(List<BigInteger> amounts) {
+        if (amounts == null || amounts.isEmpty()) {
+            throw new IllegalArgumentException("amounts must not be empty");
+        }
+        List<Long> longAmounts = amounts.stream().map(BigInteger::longValueExact).toList();
+        return postSignerTx("/internal/batch-issue", Map.of("amounts", longAmounts));
     }
 
     @Override
     public ChainTransaction redeem(BalanceChangeRequest request) {
-        return invokeSigner("/internal/redeem", request);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("amount", request.amount().longValueExact());
+        body.put("accountId", request.accountId());
+        return postSignerTx("/internal/redeem", body);
+    }
+
+    @Override
+    public BigInteger readTotalChainBalance() {
+        try {
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/internal/balance"))
+                    .timeout(Duration.ofSeconds(15))
+                    .header("X-Service-Token", serviceToken)
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalStateException("Signer balance HTTP " + response.statusCode() + ": " + response.body());
+            }
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode bal = root.path("onChainBalance");
+            if (bal.isNull() || bal.isMissingNode()) {
+                throw new IllegalStateException("Signer balance response missing onChainBalance");
+            }
+            return BigInteger.valueOf(bal.asLong());
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to read on-chain balance: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public ChainTransaction anchorLedgerHash(String sha256Hex, long entryCount) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("batchHash", sha256Hex);
+        body.put("entryCount", entryCount);
+        return postSignerTx("/internal/anchor", body);
     }
 
     @Override
@@ -63,16 +113,12 @@ public class SignerChainClient implements ChainClient {
         }
     }
 
-    private ChainTransaction invokeSigner(String path, BalanceChangeRequest request) {
+    private ChainTransaction postSignerTx(String path, Map<String, Object> body) {
         try {
-            Map<String, Object> body = new LinkedHashMap<>();
-            body.put("amount", request.amount().longValueExact());
-            body.put("accountId", request.accountId());
             String json = objectMapper.writeValueAsString(body);
-
             HttpRequest httpRequest = HttpRequest.newBuilder()
                     .uri(URI.create(baseUrl + path))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(25))
                     .header("Content-Type", "application/json")
                     .header("X-Service-Token", serviceToken)
                     .POST(HttpRequest.BodyPublishers.ofString(json))
@@ -88,7 +134,8 @@ public class SignerChainClient implements ChainClient {
             if (digest == null || digest.isBlank()) {
                 throw new IllegalStateException("Signer response missing transaction digest");
             }
-            return new ChainTransaction(digest);
+            long gasMist = root.path("gasMist").asLong(0L);
+            return new ChainTransaction(digest, Math.max(0L, gasMist));
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {

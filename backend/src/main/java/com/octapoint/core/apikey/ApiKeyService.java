@@ -79,6 +79,12 @@ public class ApiKeyService {
 
     @Transactional
     public CreatedApiKey createApiKey(String tenantId, String name) {
+        return createApiKey(tenantId, name, "ISSUE,REDEEM,READ");
+    }
+
+    @Transactional
+    public CreatedApiKey createApiKey(String tenantId, String name, String scopesRaw) {
+        String normalizedScopes = normalizeScopes(scopesRaw);
         String keyId = "ak_" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
         byte[] secretBytes = new byte[32];
         SECURE_RANDOM.nextBytes(secretBytes);
@@ -99,7 +105,7 @@ public class ApiKeyService {
         entity.setEncryptedSecret(encrypted.getCipherText());
         entity.setSecretIv(encrypted.getIv());
         entity.setStatus("ACTIVE");
-        entity.setScopes("ISSUE,REDEEM,READ");
+        entity.setScopes(normalizedScopes);
         ApiKeyEntity saved = apiKeyRepository.save(entity);
 
         return new CreatedApiKey(
@@ -113,6 +119,26 @@ public class ApiKeyService {
         );
     }
 
+    private String normalizeScopes(String scopesRaw) {
+        if (scopesRaw == null || scopesRaw.isBlank()) {
+            return "ISSUE,REDEEM,READ";
+        }
+        java.util.LinkedHashSet<String> valid = new java.util.LinkedHashSet<>();
+        for (String part : scopesRaw.split(",")) {
+            String trimmed = part.trim().toUpperCase();
+            if (trimmed.isEmpty()) continue;
+            if (!"ISSUE".equals(trimmed) && !"REDEEM".equals(trimmed) && !"READ".equals(trimmed)) {
+                throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_SCOPE",
+                        "Allowed scopes: ISSUE, REDEEM, READ");
+            }
+            valid.add(trimmed);
+        }
+        if (valid.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_SCOPE", "At least one scope is required");
+        }
+        return String.join(",", valid);
+    }
+
     @Transactional
     public CreatedApiKey rotateApiKey(String tenantId, String keyId) {
         ApiKeyEntity existing = apiKeyRepository.findByIdAndTenantId(keyId, tenantId)
@@ -124,7 +150,7 @@ public class ApiKeyService {
         existing.setRevokedAt(Instant.now());
         apiKeyRepository.save(existing);
 
-        return createApiKey(tenantId, existing.getName());
+        return createApiKey(tenantId, existing.getName(), existing.getScopes());
     }
 
     @Transactional

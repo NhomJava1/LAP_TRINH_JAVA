@@ -29,6 +29,21 @@ public class Tenant {
     @Column(nullable = false, length = 50)
     private String status = TenantStatus.PENDING.name();
 
+    @Column(name = "gas_quota_mist", nullable = false)
+    private Long gasQuotaMist = 500_000_000L;
+
+    @Column(name = "gas_used_mist", nullable = false)
+    private Long gasUsedMist = 0L;
+
+    @Column(name = "webhook_url", length = 500)
+    private String webhookUrl;
+
+    @Column(name = "webhook_secret", length = 255)
+    private String webhookSecret;
+
+    @Column(name = "subscription_plan", nullable = false, length = 50)
+    private String subscriptionPlan = "STARTER";
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -40,6 +55,15 @@ public class Tenant {
         Instant now = Instant.now();
         if (createdAt == null) {
             createdAt = now;
+        }
+        if (gasQuotaMist == null) {
+            gasQuotaMist = 500_000_000L;
+        }
+        if (gasUsedMist == null) {
+            gasUsedMist = 0L;
+        }
+        if (subscriptionPlan == null) {
+            subscriptionPlan = "STARTER";
         }
         updatedAt = now;
     }
@@ -91,6 +115,46 @@ public class Tenant {
 
     public TenantStatus getStatusEnum() {
         return TenantStatus.valueOf(status);
+    }
+
+    public Long getGasQuotaMist() {
+        return gasQuotaMist;
+    }
+
+    public void setGasQuotaMist(Long gasQuotaMist) {
+        this.gasQuotaMist = gasQuotaMist;
+    }
+
+    public Long getGasUsedMist() {
+        return gasUsedMist;
+    }
+
+    public void setGasUsedMist(Long gasUsedMist) {
+        this.gasUsedMist = gasUsedMist;
+    }
+
+    public String getWebhookUrl() {
+        return webhookUrl;
+    }
+
+    public void setWebhookUrl(String webhookUrl) {
+        this.webhookUrl = webhookUrl;
+    }
+
+    public String getWebhookSecret() {
+        return webhookSecret;
+    }
+
+    public void setWebhookSecret(String webhookSecret) {
+        this.webhookSecret = webhookSecret;
+    }
+
+    public String getSubscriptionPlan() {
+        return subscriptionPlan;
+    }
+
+    public void setSubscriptionPlan(String subscriptionPlan) {
+        this.subscriptionPlan = subscriptionPlan;
     }
 
     public Instant getCreatedAt() {

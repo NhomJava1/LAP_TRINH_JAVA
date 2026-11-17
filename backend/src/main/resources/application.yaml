@@ -47,6 +47,9 @@ app:
   signer:
     base-url: ${SIGNER_BASE_URL:http://signer:3001}
     service-token: ${SIGNER_SERVICE_TOKEN:replace-with-random-internal-token}
+  walrus:
+    poc-enabled: ${WALRUS_POC_ENABLED:false}
+    publisher-url: ${WALRUS_PUBLISHER_URL:https://publisher.walrus-testnet.walrus.space}
 
 springdoc:
   swagger-ui:

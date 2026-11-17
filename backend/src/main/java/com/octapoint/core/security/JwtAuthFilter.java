@@ -43,15 +43,25 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String correlationId = ensureCorrelationId(request, response);
+        String token = null;
         String authHeader = request.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+        } else if ("/api/portal/events/stream".equals(path)) {
+            String queryToken = request.getParameter("token");
+            if (queryToken != null && !queryToken.isBlank()) {
+                token = queryToken.trim();
+            }
+        }
+
+        if (token == null || token.isBlank()) {
             sendError(response, HttpStatus.UNAUTHORIZED.value(), "AUTH_MISSING_TOKEN", "Missing Bearer token", correlationId);
             return;
         }
 
         PortalPrincipal principal;
         try {
-            principal = jwtService.verifyToken(authHeader.substring(7).trim());
+            principal = jwtService.verifyToken(token);
         } catch (ApiException ex) {
             sendError(response, ex.getStatus(), ex.getErrorCode(), ex.getMessage(), correlationId);
             return;
@@ -61,8 +71,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_ADMIN_ONLY", "Admin role required", correlationId);
             return;
         }
-        if (isPortalRoute && !"MERCHANT".equals(principal.role())) {
-            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_MERCHANT_ONLY", "Merchant role required", correlationId);
+        if (isPortalRoute && !"MERCHANT".equals(principal.role()) && !"STAFF".equals(principal.role())) {
+            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_MERCHANT_ONLY", "Merchant or Staff role required", correlationId);
             return;
         }
 

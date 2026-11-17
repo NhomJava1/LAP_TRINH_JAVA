@@ -28,6 +28,9 @@ public class Customer {
     @Column(name = "chain_seq", nullable = false)
     private Long chainSeq = -1L;
 
+    @Column(name = "lifetime_earned_points", nullable = false)
+    private Long lifetimeEarnedPoints = 0L;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -35,6 +38,9 @@ public class Customer {
     void onCreate() {
         if (createdAt == null) {
             createdAt = Instant.now();
+        }
+        if (lifetimeEarnedPoints == null) {
+            lifetimeEarnedPoints = 0L;
         }
     }
 
@@ -76,6 +82,14 @@ public class Customer {
 
     public void setChainSeq(Long chainSeq) {
         this.chainSeq = chainSeq;
+    }
+
+    public Long getLifetimeEarnedPoints() {
+        return lifetimeEarnedPoints;
+    }
+
+    public void setLifetimeEarnedPoints(Long lifetimeEarnedPoints) {
+        this.lifetimeEarnedPoints = lifetimeEarnedPoints;
     }
 
     public Instant getCreatedAt() {

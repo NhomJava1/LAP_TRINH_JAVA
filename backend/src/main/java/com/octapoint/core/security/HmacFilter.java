@@ -2,6 +2,7 @@ package com.octapoint.core.security;
 
 import com.octapoint.core.apikey.ApiKeyService;
 import com.octapoint.core.audit.AuditService;
+import com.octapoint.core.metrics.OctaPointMetrics;
 import com.octapoint.core.shared.ApiException;
 import com.octapoint.core.shared.HmacCodec;
 import com.octapoint.core.tenant.Tenant;
@@ -32,16 +33,19 @@ public class HmacFilter extends OncePerRequestFilter {
     private final ApiKeyService apiKeyService;
     private final TenantService tenantService;
     private final AuditService auditService;
+    private final OctaPointMetrics metrics;
 
     public HmacFilter(
             NonceStore nonceStore,
             ApiKeyService apiKeyService,
             TenantService tenantService,
-            AuditService auditService) {
+            AuditService auditService,
+            OctaPointMetrics metrics) {
         this.nonceStore = nonceStore;
         this.apiKeyService = apiKeyService;
         this.tenantService = tenantService;
         this.auditService = auditService;
+        this.metrics = metrics;
     }
 
     @Override
@@ -157,6 +161,7 @@ public class HmacFilter extends OncePerRequestFilter {
 
     private void sendError(HttpServletResponse response, int status, String code, String message, String correlationId)
             throws IOException {
+        metrics.recordHmacRejected();
         response.setStatus(status);
         response.setContentType("application/json");
         response.getWriter().write(String.format(

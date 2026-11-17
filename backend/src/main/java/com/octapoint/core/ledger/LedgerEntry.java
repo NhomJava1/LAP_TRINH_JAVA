@@ -38,6 +38,12 @@ public class LedgerEntry {
     @Column(name = "chain_seq")
     private Long chainSeq;
 
+    @Column(name = "applied_tier", length = 30)
+    private String appliedTier = "BRONZE";
+
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
     @Column(name = "created_at")
     private Instant createdAt;
 
@@ -110,6 +116,22 @@ public class LedgerEntry {
 
     public void setChainSeq(Long chainSeq) {
         this.chainSeq = chainSeq;
+    }
+
+    public String getAppliedTier() {
+        return appliedTier;
+    }
+
+    public void setAppliedTier(String appliedTier) {
+        this.appliedTier = appliedTier;
+    }
+
+    public Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Instant expiresAt) {
+        this.expiresAt = expiresAt;
     }
 
     public Instant getCreatedAt() {

@@ -52,6 +52,9 @@ public class OutboxEvent {
     @Column(name = "retry_count", nullable = false)
     private Integer retryCount = 0;
 
+    @Column(name = "gas_used_mist", nullable = false)
+    private Long gasUsedMist = 0L;
+
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
 
@@ -71,6 +74,9 @@ public class OutboxEvent {
         }
         if (retryCount == null) {
             retryCount = 0;
+        }
+        if (gasUsedMist == null) {
+            gasUsedMist = 0L;
         }
     }
 
@@ -176,6 +182,14 @@ public class OutboxEvent {
 
     public void setRetryCount(Integer retryCount) {
         this.retryCount = retryCount;
+    }
+
+    public Long getGasUsedMist() {
+        return gasUsedMist;
+    }
+
+    public void setGasUsedMist(Long gasUsedMist) {
+        this.gasUsedMist = gasUsedMist;
     }
 
     public String getLastError() {

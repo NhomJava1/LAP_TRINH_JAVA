@@ -1,9 +1,18 @@
 import express from 'express';
 import { config } from './config.js';
-import { isConfigured, issue, keypair, redeem, SignerUnconfiguredError } from './sui.js';
+import {
+  anchorHash,
+  batchIssue,
+  isConfigured,
+  issue,
+  keypair,
+  readOnChainBalance,
+  redeem,
+  SignerUnconfiguredError,
+} from './sui.js';
 
 const app = express();
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '64kb' }));
 
 app.use((request, response, next) => {
   if (request.header('X-Service-Token') !== config.serviceToken) {
@@ -19,6 +28,19 @@ app.get('/health', (_request, response) => {
     configured: isConfigured,
     address: keypair ? keypair.toSuiAddress() : null,
   });
+});
+
+app.get('/internal/balance', async (_request, response) => {
+  try {
+    response.json(await readOnChainBalance());
+  } catch (error) {
+    if (error instanceof SignerUnconfiguredError) {
+      response.status(503).json({ error: error.message });
+      return;
+    }
+    console.error('Sui readOnChainBalance failed', error instanceof Error ? error.message : 'unknown error');
+    response.status(502).json({ error: 'Failed to read Sui on-chain balance' });
+  }
 });
 
 app.post('/internal/issue', async (request, response) => {
@@ -40,6 +62,25 @@ app.post('/internal/issue', async (request, response) => {
   }
 });
 
+app.post('/internal/batch-issue', async (request, response) => {
+  const amounts = request.body?.amounts;
+  if (!Array.isArray(amounts) || amounts.length === 0 || amounts.some((a) => !Number.isSafeInteger(a) || a <= 0)) {
+    response.status(400).json({ error: 'amounts must be a non-empty array of positive safe integers' });
+    return;
+  }
+
+  try {
+    response.json(await batchIssue(amounts.map((a) => BigInt(a))));
+  } catch (error) {
+    if (error instanceof SignerUnconfiguredError) {
+      response.status(503).json({ error: error.message });
+      return;
+    }
+    console.error('Sui batch-issue failed', error instanceof Error ? error.message : 'unknown error');
+    response.status(502).json({ error: 'Sui batch transaction failed' });
+  }
+});
+
 app.post('/internal/redeem', async (request, response) => {
   const amount = request.body?.amount;
   if (!Number.isSafeInteger(amount) || amount <= 0) {
@@ -56,6 +97,26 @@ app.post('/internal/redeem', async (request, response) => {
     }
     console.error('Sui redeem failed', error instanceof Error ? error.message : 'unknown error');
     response.status(502).json({ error: 'Sui transaction failed' });
+  }
+});
+
+app.post('/internal/anchor', async (request, response) => {
+  const batchHash = request.body?.batchHash;
+  const entryCount = Number(request.body?.entryCount ?? 0);
+  if (typeof batchHash !== 'string' || !/^[0-9a-fA-F]{64}$/.test(batchHash)) {
+    response.status(400).json({ error: 'batchHash must be a 64-char SHA-256 hex string' });
+    return;
+  }
+
+  try {
+    response.json(await anchorHash(batchHash, entryCount));
+  } catch (error) {
+    if (error instanceof SignerUnconfiguredError) {
+      response.status(503).json({ error: error.message });
+      return;
+    }
+    console.error('Sui anchor failed', error instanceof Error ? error.message : 'unknown error');
+    response.status(502).json({ error: 'Sui anchor transaction failed' });
   }
 });
 

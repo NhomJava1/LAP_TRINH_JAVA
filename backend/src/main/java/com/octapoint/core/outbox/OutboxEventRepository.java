@@ -12,6 +12,10 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String
 
     List<OutboxEvent> findByStatusOrderByCreatedAtDesc(String status);
 
+    List<OutboxEvent> findByStatus(String status);
+
+    List<OutboxEvent> findByTenantIdAndStatus(String tenantId, String status);
+
     List<OutboxEvent> findTop100ByOrderByCreatedAtDesc();
 
     List<OutboxEvent> findByAggregateIdIn(Collection<String> aggregateIds);
