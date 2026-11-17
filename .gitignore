@@ -61,6 +61,8 @@ node_modules/
 signer/node_modules/
 signer/dist/
 signer/.env
+sdk-ts/dist/
+frontend/.next/
 
 # Docker / local data
 docker/data/
