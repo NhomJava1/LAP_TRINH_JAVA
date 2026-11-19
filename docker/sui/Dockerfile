@@ -1,11 +1,9 @@
 FROM ubuntu:24.04
 
-# The Ubuntu base image can end up with stale or HTTP package metadata sources,
-# which causes 404s when `apt-get` resolves packages from the Ubuntu mirror.
-# Normalize to HTTPS and refresh the release metadata before installing tools.
+# Keep Ubuntu's GPG-verified HTTP mirror for initial bootstrap because minimal
+# ubuntu:24.04 does not include ca-certificates yet.
 RUN export DEBIAN_FRONTEND=noninteractive \
-    && sed -i 's#http://archive.ubuntu.com/ubuntu#https://archive.ubuntu.com/ubuntu#g; s#http://security.ubuntu.com/ubuntu#https://security.ubuntu.com/ubuntu#g' /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null || true \
-    && apt-get update --allow-releaseinfo-change \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl bash git \
     && rm -rf /var/lib/apt/lists/*
 
