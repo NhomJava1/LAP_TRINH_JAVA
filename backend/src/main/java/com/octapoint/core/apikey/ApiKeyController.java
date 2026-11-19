@@ -23,18 +23,17 @@ public class ApiKeyController {
     public ResponseEntity<?> createApiKey() {
         try {
             String keyId = "ak_" + UUID.randomUUID().toString();
-            
+
             byte[] secretBytes = new byte[32];
             SecureRandom.getInstanceStrong().nextBytes(secretBytes);
             String rawSecret = Base64.getUrlEncoder().withoutPadding().encodeToString(secretBytes);
 
-            ApiKeyService.EncryptedResult encryptedResult = apiKeyService.encrypt(rawSecret);
+            apiKeyService.encrypt(rawSecret);
 
             return ResponseEntity.ok(Map.of(
                     "key_id", keyId,
                     "secret", rawSecret,
-                    "created_at", Instant.now().toString()
-            ));
+                    "created_at", Instant.now().toString()));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));

@@ -1,6 +1,6 @@
 # OctaPoint SDK & MCP Integration Guide
 
-Hướng dẫn tích hợp chuẩn cho **Merchant System** (TypeScript SDK, Java 21 SDK) và **AI Agents / LLM Assistants** (Model Context Protocol Server) theo đặc tả **ADR-0003**, `FR-11`, `FR-17`, `FR-25`, `FR-26`, `FR-28` và `FR-32`.
+Hướng dẫn tích hợp chuẩn cho **Merchant System** (TypeScript SDK, Java 25 SDK) và **AI Agents / LLM Assistants** (Model Context Protocol Server) theo đặc tả **ADR-0003**, `FR-11`, `FR-17`, `FR-25`, `FR-26`, `FR-28` và `FR-32`.
 
 ---
 
@@ -103,9 +103,9 @@ const isValid = verifyWebhookSignature({
 
 ---
 
-## 3. Java 21 SDK (`sdk-java/` — `FR-25`)
+## 3. Java 25 SDK (`sdk-java/` — `FR-25`)
 
-SDK thuần Java 21 dùng `java.net.http.HttpClient` và Jackson (`pom.xml` trong `sdk-java/`).
+SDK thuần Java 25 dùng `java.net.http.HttpClient` và Jackson (`pom.xml` trong `sdk-java/`).
 
 ```java
 import com.octapoint.sdk.HmacSigner;
@@ -129,7 +129,7 @@ boolean validWebhook = HmacSigner.verifyWebhookSignature(
 
 Chạy kiểm thử Java SDK:
 ```powershell
-docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/sdk-java:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn --batch-mode test
+docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/sdk-java:/workspace" -w /workspace maven:3.9-eclipse-temurin-25 mvn --batch-mode test
 ```
 
 ---

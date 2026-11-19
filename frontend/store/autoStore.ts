@@ -62,7 +62,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'octapoint-auth',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined'
+          ? window.localStorage
+          : {
+              getItem: () => null,
+              setItem: () => {},
+              removeItem: () => {},
+            }
+      ),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

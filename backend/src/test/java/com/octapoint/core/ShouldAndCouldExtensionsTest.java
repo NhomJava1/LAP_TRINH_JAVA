@@ -366,6 +366,25 @@ class ShouldAndCouldExtensionsTest {
                         .content(rulePayload))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("FORBIDDEN_MERCHANT_OWNER_ONLY"));
+
+        // Legacy v1 endpoints must require JWT auth and enforce role/tenant isolation
+        mockMvc.perform(get("/api/v1/credits/balance?customerId=C_EXT&tenantId=spoofed"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("AUTH_MISSING_TOKEN"));
+
+        mockMvc.perform(post("/api/v1/api-keys"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("AUTH_MISSING_TOKEN"));
+
+        mockMvc.perform(post("/api/v1/api-keys")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("FORBIDDEN_ADMIN_ONLY"));
+
+        mockMvc.perform(get("/api/v1/credits/balance?customerId=C_EXT&tenantId=spoofed")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.customerId").value("C_EXT"));
     }
 
     private String login(String email, String password) throws Exception {

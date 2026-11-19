@@ -9,7 +9,7 @@ Tài liệu này mô tả cách khởi chạy toàn bộ hệ thống **OctaPoin
 | Dịch vụ | Công nghệ | URL / Port | Vai trò |
 |---|---|---|---|
 | **Frontend Portal** | Next.js 16 / React 19 | http://localhost:3000 | Cổng Merchant & System Admin |
-| **Backend Core** | Spring Boot 3.3.4 / Java 21 | http://localhost:8080 | API nghiệp vụ, Auth, HMAC, Ledger, Outbox Worker |
+| **Backend Core** | Spring Boot 3.5.16 / Java 25 | http://localhost:8080 | API nghiệp vụ, Auth, HMAC, Ledger, Outbox Worker |
 | **Swagger / OpenAPI** | springdoc-openapi | http://localhost:8080/swagger-ui.html | Tài liệu API tương tác |
 | **Signer Service** | Node.js / TypeScript (`@mysten/sui`) | http://localhost:3001 | Ký và gửi giao dịch lên Sui Testnet |
 | **PostgreSQL 15** | Docker Compose (`octapoint_postgres`) | `localhost:5432` | Nguồn dữ liệu có thẩm quyền (SSOT) |
@@ -108,11 +108,11 @@ npm run demo
 
 - **Backend (Unit + ArchUnit + Integration + Should/Could + NFR-03 Concurrency):**
   ```powershell
-  docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn --batch-mode verify
+  docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/backend:/workspace" -w /workspace maven:3.9-eclipse-temurin-25 mvn --batch-mode verify
   ```
-- **Java 21 SDK (`FR-25`):**
+- **Java 25 SDK (`FR-25`):**
   ```powershell
-  docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/sdk-java:/workspace" -w /workspace maven:3.9-eclipse-temurin-21 mvn --batch-mode test
+  docker run --rm -v octapoint-m2:/root/.m2 -v "${PWD}/sdk-java:/workspace" -w /workspace maven:3.9-eclipse-temurin-25 mvn --batch-mode test
   ```
 - **TypeScript SDK (`FR-26`, `FR-28`):** `cd sdk-ts && npm test && npm run build`
 - **MCP Server (`FR-17`, `FR-32`):** `cd mcp-server && npm test && npm run build`
@@ -134,7 +134,7 @@ npm run demo
 
 | Tài liệu | Nội dung |
 |---|---|
-| [SDK_and_MCP_Guide.md](./SDK_and_MCP_Guide.md) | Hướng dẫn HMAC ADR-0003, TypeScript SDK, Java 21 SDK và MCP Server (`FR-17`, `FR-32`) |
+| [SDK_and_MCP_Guide.md](./SDK_and_MCP_Guide.md) | Hướng dẫn HMAC ADR-0003, TypeScript SDK, Java 25 SDK và MCP Server (`FR-17`, `FR-32`) |
 | [Database_and_Move_Specification.md](./Database_and_Move_Specification.md) | Đặc tả PostgreSQL Flyway `V1`–`V5` và Move Smart Contract `octapoint.move` |
 | [Test_Plan_and_Report.md](./Test_Plan_and_Report.md) | Kế hoạch kiểm thử, ma trận xác minh FR/NFR và báo cáo Load Test `NFR-01` |
 | [User_Manual.md](./User_Manual.md) | Hướng dẫn sử dụng Portal cho Merchant Owner, Staff và System Admin |

@@ -16,7 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Official Java 21 SDK for the OctaPoint Merchant HMAC API (FR-25).
+ * Official Java 25 SDK for the OctaPoint Merchant HMAC API (FR-25).
  */
 public class OctaPointJavaClient {
 

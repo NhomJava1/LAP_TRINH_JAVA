@@ -25,7 +25,7 @@ Tài liệu này mô tả thiết kế mục tiêu. Tại thời điểm viết,
 
 | Lĩnh vực | Ràng buộc |
 |---|---|
-| Ngôn ngữ và framework Core | Java 21, Spring Boot 3.3.4 |
+| Ngôn ngữ và framework Core | Java 25, Spring Boot 3.5.16 |
 | Cơ sở dữ liệu | PostgreSQL 15 trong Docker Compose; Flyway quản lý migration PostgreSQL |
 | Cache/trạng thái bảo mật | Redis 7 |
 | Signer | Dịch vụ Node.js/TypeScript riêng, dự kiến chỉ được gọi nội bộ |

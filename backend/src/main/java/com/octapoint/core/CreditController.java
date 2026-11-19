@@ -2,6 +2,8 @@ package com.octapoint.core;
 
 import com.octapoint.core.ledger.LedgerService;
 import com.octapoint.core.model.CreditBalance;
+import com.octapoint.core.security.PortalPrincipal;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,11 +25,16 @@ public class CreditController {
     @GetMapping("/balance")
     public ResponseEntity<CreditBalance> getBalance(
             @RequestParam String customerId,
-            @RequestParam(required = false) String tenantId) {
+            @RequestParam(required = false) String tenantId,
+            HttpServletRequest request) {
+        PortalPrincipal principal = (PortalPrincipal) request.getAttribute(PortalPrincipal.REQUEST_ATTR);
+        String effectiveTenantId = (principal != null && principal.tenantId() != null)
+                ? principal.tenantId()
+                : null;
         CreditBalance dto = new CreditBalance();
         dto.setCustomerId(customerId);
-        if (tenantId != null && !tenantId.isBlank()) {
-            Map<String, Object> real = ledgerService.getBalance(tenantId.trim(), customerId);
+        if (effectiveTenantId != null && !effectiveTenantId.isBlank()) {
+            Map<String, Object> real = ledgerService.getBalance(effectiveTenantId.trim(), customerId);
             Number bal = (Number) real.get("balance");
             dto.setBalance(bal != null ? bal.intValue() : 0);
             String st = String.valueOf(real.get("settlementStatus"));

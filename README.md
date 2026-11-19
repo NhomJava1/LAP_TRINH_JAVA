@@ -60,7 +60,7 @@ Trước khi cài đặt, hãy đảm bảo máy tính đã có các công cụ 
 |---|---|
 | Node.js | 18.x trở lên |
 | npm | Đi kèm Node.js |
-| Java JDK | 21 |
+| Java JDK | 25 |
 | Docker Desktop | Phiên bản mới nhất |
 | Git | Phiên bản mới nhất |
 | Sui CLI | Tùy chọn |

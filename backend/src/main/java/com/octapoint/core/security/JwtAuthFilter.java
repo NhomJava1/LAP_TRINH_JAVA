@@ -33,9 +33,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String path = request.getRequestURI();
-        boolean isAdminRoute = path.startsWith("/api/admin/") || path.startsWith("/api/v1/admin/");
+        boolean isAdminRoute = path.startsWith("/api/admin/") || path.startsWith("/api/v1/admin/")
+                || path.equals("/api/v1/api-keys") || path.startsWith("/api/v1/api-keys/");
         boolean isPortalRoute = (path.startsWith("/api/portal/") && !path.startsWith("/api/portal/auth/"))
-                || path.startsWith("/api/v1/merchants/api-keys");
+                || path.startsWith("/api/v1/merchants/api-keys")
+                || path.startsWith("/api/v1/credits/");
 
         if (!isAdminRoute && !isPortalRoute) {
             filterChain.doFilter(request, response);

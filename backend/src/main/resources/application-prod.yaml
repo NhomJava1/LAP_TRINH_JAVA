@@ -15,3 +15,9 @@ spring:
 logging:
   level:
     org.hibernate.SQL: WARN
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus

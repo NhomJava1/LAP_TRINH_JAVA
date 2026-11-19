@@ -9,7 +9,7 @@ Tài liệu tổng hợp chiến lược kiểm thử, ma trận xác minh yêu 
 | Tầng kiểm thử | Công cụ / Framework | Phạm vi bao phủ |
 |---|---|---|
 | **Static Architecture Check** | `ArchUnit` (`ArchitectureTest`) | Ràng buộc module boundary `..tenant..`, ép mọi `ChainClient` nằm trong `..chain..`, cấm rò rỉ `MockChainClient` ra ngoài |
-| **Cross-Language Crypto & Unit Tests** | `JUnit 5`, Node `tsx --test` | Canonicalize RFC 3986, HMAC-SHA256 test vector chung giữa Java Core, Java 21 SDK và TypeScript SDK; Offline Queue; MCP schema |
+| **Cross-Language Crypto & Unit Tests** | `JUnit 5`, Node `tsx --test` | Canonicalize RFC 3986, HMAC-SHA256 test vector chung giữa Java Core, Java SDK và TypeScript SDK; Offline Queue; MCP schema |
 | **Backend Integration & Concurrency** | Spring Boot `@SpringBootTest` + `@AutoConfigureMockMvc` + H2 PostgreSQL Mode | Đăng ký/duyệt Tenant, xoay vòng/thu hồi API Key, Scope enforcement, Idempotency, Replay Nonce, RBAC (`ADMIN`/`MERCHANT`/`STAFF`), **20 luồng đồng thời `SELECT FOR UPDATE` (`NFR-03`)**, Rule Tier/Expiry (`FR-18`), Webhook HMAC (`FR-28`), Gas Quota (`FR-27`), Reconcile (`FR-29`), Ledger Anchor (`FR-30`), Metrics (`NFR-06`) |
 | **Smart Contract Move Tests** | `sui move test` | `octapoint_move::octapoint` init, `issue`, `redeem`, `settle_issue`, `settle_redeem`, chặn trừ âm số dư (`E_INSUFFICIENT_BALANCE`) và sai `seq` (`E_SEQ_MISMATCH`) |
 | **AI MCP Protocol E2E** | `@modelcontextprotocol/sdk` `InMemoryTransport` | Kiểm tra mặc định chỉ expose 4 read tools (`FR-17`), chế độ write yêu cầu xác nhận 2 bước (`FR-32`) và `403 INSUFFICIENT_SCOPE` với key `READ` |
@@ -23,8 +23,8 @@ Tài liệu tổng hợp chiến lược kiểm thử, ma trận xác minh yêu 
 
 | Module | Lệnh kiểm thử | Kết quả | Chi tiết |
 |---|---|---|---|
-| **Backend Core** | `mvn --batch-mode verify` *(Docker Maven 3.9 / Temurin 21)* | **PASS (`9/9`)** | `MockChainClientTest` (`2/2`), `MvpFlowAndConcurrencyTest` (`1/1` — bao gồm `NFR-03` 20 luồng đồng thời), `HmacCodecTest` (`2/2`), `ShouldAndCouldExtensionsTest` (`1/1`), `ArchitectureTest` (`3/3`) |
-| **Java 21 SDK** | `mvn --batch-mode test` *(Docker Maven 3.9 / Temurin 21)* | **PASS (`3/3`)** | Cross-language HMAC vector match, Webhook signature verify, HTTP client + `403 INSUFFICIENT_SCOPE` handling |
+| **Backend Core** | `mvn --batch-mode verify` *(Maven 3.9 / Temurin 25, Spring Boot 3.5.16)* | **PASS (`9/9`)** | `MockChainClientTest` (`2/2`), `MvpFlowAndConcurrencyTest` (`1/1` — bao gồm `NFR-03` 20 luồng đồng thời), `HmacCodecTest` (`2/2`), `ShouldAndCouldExtensionsTest` (`1/1`), `ArchitectureTest` (`3/3`) |
+| **Java SDK** | `mvn --batch-mode test` *(Maven 3.9 / Temurin 25)* | **PASS (`3/3`)** | Cross-language HMAC vector match, Webhook signature verify, HTTP client + `403 INSUFFICIENT_SCOPE` handling |
 | **TypeScript SDK** | `cd sdk-ts && npm test && npm run build` | **PASS (`4/4`)** | Canonicalize RFC 3986, HMAC shared test vector, `verifyWebhookSignature`, `OfflineCreditQueue` FIFO retry |
 | **MCP Server** | `cd mcp-server && npm test && npm run build` | **PASS (`2/2`)** | Read-only 4 tools mặc định (`FR-17`), 2-step confirmation write (`FR-32`) & chặn replay token |
 | **Sui Signer** | `cd signer && npm test && npm run build` | **PASS** | `tsc --noEmit` & `tsc` exit `0` |

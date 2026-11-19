@@ -185,7 +185,7 @@ End-user/khách tích điểm không tương tác trực tiếp trong MVP; họ 
 
 | Thành phần | Yêu cầu |
 |---|---|
-| Backend | Java 21 LTS, Spring Boot 3.3+, Spring Security |
+| Backend | Java 25 LTS, Spring Boot 3.5+, Spring Security |
 | Database | PostgreSQL 16+ |
 | Cache | Redis 7+ |
 | Signer | Node.js 20+ LTS, TypeScript 5+, `@mysten/sui` |
