@@ -31,6 +31,16 @@ module octapoint_move::octapoint {
     ) {
         balance.amount = balance.amount + amount;
     }
+    const EInsufficientBalance: u64 = 1;
+
+    public fun redeem(
+        _: &AdminCap,
+        balance: &mut Balance,
+        amount: u64,
+    ) {
+        assert!(balance.amount >= amount, EInsufficientBalance);
+        balance.amount = balance.amount - amount;
+    }
 
     public fun balance(balance: &Balance): u64 {
         balance.amount

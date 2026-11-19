@@ -31,6 +31,28 @@ services:
     stdin_open: true
     tty: true
 
+  signer:
+    build:
+      context: ./signer
+      dockerfile: Dockerfile
+    container_name: octapoint_signer
+    environment:
+      PORT: ${SIGNER_PORT:-3001}
+      SUI_RPC_URL: ${SUI_RPC_URL:-https://fullnode.testnet.sui.io:443}
+      SUI_PRIVATE_KEY: ${SUI_PRIVATE_KEY:?Set SUI_PRIVATE_KEY in .env}
+      SUI_PACKAGE_ID: ${SUI_PACKAGE_ID:?Set SUI_PACKAGE_ID in .env}
+      SUI_MODULE_NAME: ${SUI_MODULE_NAME:-octapoint}
+      SUI_ADMIN_CAP_ID: ${SUI_ADMIN_CAP_ID:?Set SUI_ADMIN_CAP_ID in .env}
+      SUI_BALANCE_ID: ${SUI_BALANCE_ID:?Set SUI_BALANCE_ID in .env}
+      SERVICE_TOKEN: ${SIGNER_SERVICE_TOKEN:?Set SIGNER_SERVICE_TOKEN in .env}
+    ports:
+      - "${SIGNER_PORT:-3001}:3001"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health',{headers:{'X-Service-Token':process.env.SERVICE_TOKEN}}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
   core:
     build:
       context: .
@@ -50,6 +72,17 @@ services:
     depends_on:
       - postgres
       - redis
+    environment:
+      # ... giữ nguyên các biến cũ ...
+      SIGNER_URL: ${SIGNER_URL:-http://signer:3001}
+      SIGNER_SERVICE_TOKEN: ${SIGNER_SERVICE_TOKEN:?Set SIGNER_SERVICE_TOKEN in .env}
+    depends_on:
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      signer:
+        condition: service_healthy
 
 volumes:
   pgdata:

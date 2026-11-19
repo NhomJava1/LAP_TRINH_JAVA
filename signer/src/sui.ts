@@ -48,3 +48,41 @@ export async function issue(amount: bigint) {
     gasUsed: result.Transaction.effects?.gasUsed,
   };
 }
+
+export async function redeem(amount: bigint) {
+  if (amount <= 0n) throw new Error('amount must be positive');
+
+  const transaction = new Transaction();
+  transaction.setGasBudget(10_000_000);
+  transaction.moveCall({
+    target: `${config.packageId}::${config.moduleName}::redeem`,
+    arguments: [
+      transaction.object(config.adminCapId),
+      transaction.object(config.balanceId),
+      transaction.pure.u64(amount),
+    ],
+  });
+
+  const result = await suiClient.signAndExecuteTransaction({
+    signer: keypair,
+    transaction,
+    include: { effects: true, events: true },
+  });
+
+  if (result.$kind === 'FailedTransaction') {
+    const error = result.FailedTransaction.status.error as unknown;
+    const message =
+      typeof error === 'string'
+        ? error
+        : error && typeof error === 'object' && 'message' in error
+          ? String(error.message)
+          : 'Sui transaction failed';
+    throw new Error(message);
+  }
+
+  return {
+    digest: result.Transaction.digest,
+    status: 'SETTLED' as const,
+    gasUsed: result.Transaction.effects?.gasUsed,
+  };
+}

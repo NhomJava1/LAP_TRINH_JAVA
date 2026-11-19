@@ -1,6 +1,7 @@
 import express from 'express';
 import { config } from './config.js';
 import { issue, keypair } from './sui.js';
+import { issue, redeem, keypair } from './sui.js';
 
 const app = express();
 app.use(express.json({ limit: '32kb' }));
@@ -30,6 +31,20 @@ app.post('/internal/issue', async (request, response) => {
     console.error('Sui issue failed', error instanceof Error ? error.message : 'unknown error');
     response.status(502).json({ error: 'Sui transaction failed' });
   }
+  app.post('/internal/redeem', async (request, response) => {
+  const amount = request.body?.amount;
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    response.status(400).json({ error: 'amount must be a positive safe integer' });
+    return;
+  }
+
+  try {
+    response.json(await redeem(BigInt(amount)));
+  } catch (error) {
+    console.error('Sui redeem failed', error instanceof Error ? error.message : error);
+    response.status(502).json({ error: 'Sui transaction failed' });
+  }
+});
 });
 
 app.use((error: unknown, _request: express.Request, response: express.Response, next: express.NextFunction) => {
