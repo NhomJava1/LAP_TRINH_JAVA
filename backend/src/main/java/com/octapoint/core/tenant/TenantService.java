@@ -1,6 +1,8 @@
 package com.octapoint.core.tenant;
 
 import com.octapoint.core.shared.ApiException;
+import com.octapoint.core.shared.WebhookUrlValidator;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,12 +20,17 @@ public class TenantService {
 
     private final TenantRepository tenantRepository;
     private final TenantRuleRepository tenantRuleRepository;
+    private final boolean allowLocalWebhookTargets;
     private final ConcurrentHashMap<String, Tenant> tenantCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, TenantRule> ruleCache = new ConcurrentHashMap<>();
 
-    public TenantService(TenantRepository tenantRepository, TenantRuleRepository tenantRuleRepository) {
+    public TenantService(
+            TenantRepository tenantRepository,
+            TenantRuleRepository tenantRuleRepository,
+            @Value("${app.security.webhook.allow-local-targets:false}") boolean allowLocalWebhookTargets) {
         this.tenantRepository = tenantRepository;
         this.tenantRuleRepository = tenantRuleRepository;
+        this.allowLocalWebhookTargets = allowLocalWebhookTargets;
     }
 
     @Transactional
@@ -100,9 +107,7 @@ public class TenantService {
         Tenant tenant = loadTenantFromDb(tenantId);
         if (webhookUrl != null && !webhookUrl.isBlank()) {
             String trimmed = webhookUrl.trim();
-            if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-                throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_WEBHOOK_URL", "Webhook URL must start with http:// or https://");
-            }
+            WebhookUrlValidator.validate(trimmed, allowLocalWebhookTargets);
             tenant.setWebhookUrl(trimmed);
             if (webhookSecret != null && !webhookSecret.isBlank()) {
                 tenant.setWebhookSecret(webhookSecret.trim());
@@ -122,7 +127,8 @@ public class TenantService {
     public Tenant updateSubscriptionPlan(String tenantId, String plan) {
         String normalized = plan != null ? plan.trim().toUpperCase() : "";
         if (!ALLOWED_PLANS.contains(normalized)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_PLAN", "Allowed plans: STARTER, GROWTH, ENTERPRISE");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_PLAN",
+                    "Allowed plans: STARTER, GROWTH, ENTERPRISE");
         }
         Tenant tenant = loadTenantFromDb(tenantId);
         tenant.setSubscriptionPlan(normalized);
@@ -143,7 +149,8 @@ public class TenantService {
 
     private Tenant loadTenantFromDb(String tenantId) {
         return tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND.value(), "TENANT_NOT_FOUND", "Tenant not found: " + tenantId));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND.value(), "TENANT_NOT_FOUND",
+                        "Tenant not found: " + tenantId));
     }
 
     public List<Tenant> listTenants() {
@@ -188,8 +195,7 @@ public class TenantService {
                 existing.getSilverThresholdPoints(),
                 existing.getGoldThresholdPoints(),
                 existing.getSilverMultiplier(),
-                existing.getGoldMultiplier()
-        );
+                existing.getGoldMultiplier());
     }
 
     @Transactional
@@ -203,15 +209,18 @@ public class TenantService {
             BigDecimal silverMultiplier,
             BigDecimal goldMultiplier) {
         if (earnVndPerPoint <= 0 || redeemValueVndPerPoint <= 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_RULE_RATE", "Earn and redeem rates must be positive integers");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_RULE_RATE",
+                    "Earn and redeem rates must be positive integers");
         }
         if (pointExpiryDays <= 0 || silverThresholdPoints < 0 || goldThresholdPoints < silverThresholdPoints) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_TIER_CONFIG", "Invalid expiry days or tier thresholds");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_TIER_CONFIG",
+                    "Invalid expiry days or tier thresholds");
         }
         if (silverMultiplier == null || goldMultiplier == null
                 || silverMultiplier.compareTo(BigDecimal.ONE) < 0
                 || goldMultiplier.compareTo(silverMultiplier) < 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_MULTIPLIER", "Tier multipliers must be >= 1.0 and gold >= silver");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_MULTIPLIER",
+                    "Tier multipliers must be >= 1.0 and gold >= silver");
         }
 
         TenantRule rule = tenantRuleRepository.findByTenantId(tenantId).orElseGet(() -> {

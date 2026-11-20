@@ -67,7 +67,8 @@ public class AdminController {
     }
 
     @GetMapping("/api/admin/dashboard")
-    public ResponseEntity<Map<String, Object>> dashboard() {
+    public ResponseEntity<Map<String, Object>> dashboard(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalTenants", tenantService.countAll());
         stats.put("pendingTenants", tenantService.countByStatus(TenantStatus.PENDING));
@@ -83,21 +84,22 @@ public class AdminController {
         return ResponseEntity.ok(stats);
     }
 
-    @GetMapping({"/api/admin/tenants", "/api/v1/admin/tenants"})
-    public ResponseEntity<List<Map<String, Object>>> listTenants() {
+    @GetMapping({ "/api/admin/tenants", "/api/v1/admin/tenants" })
+    public ResponseEntity<List<Map<String, Object>>> listTenants(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         List<Map<String, Object>> items = tenantService.listTenants().stream()
                 .map(this::toTenantDto)
                 .toList();
         return ResponseEntity.ok(items);
     }
 
-    @RequestMapping(path = "/api/admin/tenants/{id}/status", method = {RequestMethod.PATCH, RequestMethod.POST})
+    @RequestMapping(path = "/api/admin/tenants/{id}/status", method = { RequestMethod.PATCH, RequestMethod.POST })
     public ResponseEntity<Map<String, Object>> updateTenantStatus(
             @PathVariable String id,
-            @RequestBody Map<String, String> body,
+            @RequestBody UpdateTenantStatusRequest body,
             HttpServletRequest request) {
         PortalPrincipal admin = requireAdminPrincipal(request);
-        String statusRaw = body.get("status");
+        String statusRaw = body != null ? body.status() : null;
         if (statusRaw == null || statusRaw.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_STATUS", "status is required");
         }
@@ -119,14 +121,14 @@ public class AdminController {
     @PatchMapping("/api/admin/tenants/{id}/gas-quota")
     public ResponseEntity<Map<String, Object>> updateGasQuota(
             @PathVariable String id,
-            @RequestBody Map<String, Object> body,
+            @RequestBody UpdateGasQuotaRequest body,
             HttpServletRequest request) {
         PortalPrincipal admin = requireAdminPrincipal(request);
-        Object rawQuota = body.get("gasQuotaMist");
-        if (!(rawQuota instanceof Number num) || num.longValue() < 0) {
+        Long rawQuota = body != null ? body.gasQuotaMist() : null;
+        if (rawQuota == null || rawQuota < 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_GAS_QUOTA", "gasQuotaMist must be >= 0");
         }
-        Tenant updated = tenantService.updateGasQuota(id, num.longValue());
+        Tenant updated = tenantService.updateGasQuota(id, rawQuota);
         int resumed = outboxSettlementWorker.resumePausedGasEvents(id);
 
         auditService.log(updated.getId(), admin.email(), "ADMIN", "TENANT_GAS_QUOTA_UPDATED",
@@ -140,7 +142,9 @@ public class AdminController {
 
     @GetMapping("/api/admin/settlements")
     public ResponseEntity<List<Map<String, Object>>> listSettlements(
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            HttpServletRequest request) {
+        requireAdminPrincipal(request);
         List<Map<String, Object>> items = outboxSettlementWorker.listSettlements(status).stream()
                 .map(this::toSettlementDto)
                 .toList();
@@ -157,22 +161,26 @@ public class AdminController {
     }
 
     @GetMapping("/api/admin/audit-logs")
-    public ResponseEntity<List<AuditLog>> listAuditLogs() {
+    public ResponseEntity<List<AuditLog>> listAuditLogs(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(auditService.listAllRecent());
     }
 
     @GetMapping("/api/admin/analytics")
-    public ResponseEntity<Map<String, Object>> analytics() {
+    public ResponseEntity<Map<String, Object>> analytics(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(ledgerService.getGlobalAnalytics());
     }
 
     @GetMapping("/api/admin/metrics-summary")
-    public ResponseEntity<Map<String, Object>> metricsSummary() {
+    public ResponseEntity<Map<String, Object>> metricsSummary(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(metrics.summary());
     }
 
     @GetMapping("/api/admin/anomalies")
-    public ResponseEntity<?> anomalies() {
+    public ResponseEntity<?> anomalies(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(anomalyService.listAll());
     }
 
@@ -183,7 +191,8 @@ public class AdminController {
     }
 
     @GetMapping("/api/admin/reconcile/reports")
-    public ResponseEntity<?> listReconciliationReports() {
+    public ResponseEntity<?> listReconciliationReports(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(reconciliationService.listRecent());
     }
 
@@ -194,14 +203,18 @@ public class AdminController {
     }
 
     @GetMapping("/api/admin/anchors")
-    public ResponseEntity<?> listAnchors() {
+    public ResponseEntity<?> listAnchors(HttpServletRequest request) {
+        requireAdminPrincipal(request);
         return ResponseEntity.ok(anchorService.listRecent());
     }
 
     private PortalPrincipal requireAdminPrincipal(HttpServletRequest request) {
         Object attr = request.getAttribute(PortalPrincipal.REQUEST_ATTR);
-        if (!(attr instanceof PortalPrincipal principal) || !"ADMIN".equals(principal.role())) {
+        if (!(attr instanceof PortalPrincipal principal)) {
             throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED", "Admin authentication required");
+        }
+        if (!"ADMIN".equals(principal.role())) {
+            throw new ApiException(HttpStatus.FORBIDDEN.value(), "FORBIDDEN_ADMIN_ONLY", "Admin role required");
         }
         return principal;
     }
@@ -239,5 +252,11 @@ public class AdminController {
         map.put("createdAt", evt.getCreatedAt() != null ? evt.getCreatedAt().toString() : null);
         map.put("settledAt", evt.getSettledAt() != null ? evt.getSettledAt().toString() : null);
         return map;
+    }
+
+    public record UpdateTenantStatusRequest(String status) {
+    }
+
+    public record UpdateGasQuotaRequest(Long gasQuotaMist) {
     }
 }

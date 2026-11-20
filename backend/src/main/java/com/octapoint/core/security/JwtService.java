@@ -29,6 +29,9 @@ public class JwtService {
     public JwtService(
             ObjectMapper objectMapper,
             @Value("${app.security.jwt-secret}") String jwtSecret) {
+        if (jwtSecret == null || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalArgumentException("JWT secret must be at least 32 bytes for HS256");
+        }
         this.objectMapper = objectMapper;
         this.secretBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
     }

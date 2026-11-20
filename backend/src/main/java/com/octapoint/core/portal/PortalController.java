@@ -86,7 +86,7 @@ public class PortalController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping({"/api/portal/api-keys", "/api/v1/merchants/api-keys"})
+    @GetMapping({ "/api/portal/api-keys", "/api/v1/merchants/api-keys" })
     public ResponseEntity<List<Map<String, Object>>> listApiKeys(HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
         List<Map<String, Object>> items = apiKeyService.listByTenant(principal.tenantId()).stream()
@@ -95,18 +95,19 @@ public class PortalController {
         return ResponseEntity.ok(items);
     }
 
-    @PostMapping({"/api/portal/api-keys", "/api/v1/merchants/api-keys"})
+    @PostMapping({ "/api/portal/api-keys", "/api/v1/merchants/api-keys" })
     public ResponseEntity<Map<String, Object>> createApiKey(
-            @RequestBody(required = false) Map<String, String> body,
+            @RequestBody(required = false) CreateApiKeyRequest body,
             HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
         Tenant tenant = requireApprovedTenant(principal.tenantId());
-        String keyName = body != null ? body.get("name") : null;
-        String scopes = body != null ? body.get("scopes") : null;
+        String keyName = body != null ? body.name() : null;
+        String scopes = body != null ? body.scopes() : null;
 
         ApiKeyService.CreatedApiKey created = apiKeyService.createApiKey(tenant.getId(), keyName, scopes);
         auditService.log(tenant.getId(), principal.email(), "MERCHANT", "API_KEY_CREATED",
-                "API_KEY", created.id(), "SUCCESS", "Created API key " + created.name() + " scopes=" + created.scopes(), null);
+                "API_KEY", created.id(), "SUCCESS", "Created API key " + created.name() + " scopes=" + created.scopes(),
+                null);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toCreatedApiKeyDto(created));
     }
@@ -146,27 +147,28 @@ public class PortalController {
 
     @PutMapping("/api/portal/rules")
     public ResponseEntity<Map<String, Object>> updateRules(
-            @RequestBody Map<String, Object> body,
+            @RequestBody UpdateRuleRequest body,
             HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
         TenantRule current = tenantService.getOrCreateRule(principal.tenantId());
-        long earnRate = parsePositiveLong(body.get("earnVndPerPoint"), "earnVndPerPoint");
-        long redeemRate = parsePositiveLong(body.get("redeemValueVndPerPoint"), "redeemValueVndPerPoint");
+        long earnRate = parsePositiveLong(body != null ? body.earnVndPerPoint() : null, "earnVndPerPoint");
+        long redeemRate = parsePositiveLong(body != null ? body.redeemValueVndPerPoint() : null,
+                "redeemValueVndPerPoint");
 
-        int expiryDays = body.get("pointExpiryDays") instanceof Number n
-                ? n.intValue()
+        int expiryDays = (body != null && body.pointExpiryDays() != null)
+                ? body.pointExpiryDays()
                 : current.getPointExpiryDays();
-        long silverThreshold = body.get("silverThresholdPoints") instanceof Number n
-                ? n.longValue()
+        long silverThreshold = (body != null && body.silverThresholdPoints() != null)
+                ? body.silverThresholdPoints()
                 : current.getSilverThresholdPoints();
-        long goldThreshold = body.get("goldThresholdPoints") instanceof Number n
-                ? n.longValue()
+        long goldThreshold = (body != null && body.goldThresholdPoints() != null)
+                ? body.goldThresholdPoints()
                 : current.getGoldThresholdPoints();
-        BigDecimal silverMult = body.get("silverMultiplier") != null
-                ? new BigDecimal(String.valueOf(body.get("silverMultiplier")))
+        BigDecimal silverMult = (body != null && body.silverMultiplier() != null)
+                ? body.silverMultiplier()
                 : current.getSilverMultiplier();
-        BigDecimal goldMult = body.get("goldMultiplier") != null
-                ? new BigDecimal(String.valueOf(body.get("goldMultiplier")))
+        BigDecimal goldMult = (body != null && body.goldMultiplier() != null)
+                ? body.goldMultiplier()
                 : current.getGoldMultiplier();
 
         TenantRule updated = tenantService.updateAdvancedRule(
@@ -177,8 +179,7 @@ public class PortalController {
                 silverThreshold,
                 goldThreshold,
                 silverMult,
-                goldMult
-        );
+                goldMult);
         auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "RULE_UPDATED",
                 "TENANT_RULE", updated.getId(), "SUCCESS",
                 "earnVndPerPoint=" + earnRate + ", redeemValueVndPerPoint=" + redeemRate
@@ -233,17 +234,20 @@ public class PortalController {
 
     @PutMapping("/api/portal/webhook")
     public ResponseEntity<Map<String, Object>> updateWebhook(
-            @RequestBody Map<String, String> body,
+            @RequestBody UpdateWebhookRequest body,
             HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
+        requireApprovedTenant(principal.tenantId());
+        String webhookUrl = body != null ? body.webhookUrl() : null;
+        String webhookSecret = body != null ? body.webhookSecret() : null;
         Tenant updated = tenantService.updateWebhook(
-                principal.tenantId(), body.get("webhookUrl"), body.get("webhookSecret"));
+                principal.tenantId(), webhookUrl, webhookSecret);
         auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "WEBHOOK_UPDATED",
                 "TENANT", updated.getId(), "SUCCESS", "url=" + updated.getWebhookUrl(), null);
 
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("webhookUrl", updated.getWebhookUrl());
-        map.put("webhookSecret", updated.getWebhookSecret());
+        map.put("hasSecret", updated.getWebhookSecret() != null && !updated.getWebhookSecret().isBlank());
         return ResponseEntity.ok(map);
     }
 
@@ -256,13 +260,15 @@ public class PortalController {
     @PostMapping("/api/portal/webhook/test")
     public ResponseEntity<?> testWebhook(HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
+        requireApprovedTenant(principal.tenantId());
         return ResponseEntity.ok(webhookService.sendTestWebhook(principal.tenantId()));
     }
 
     @GetMapping("/api/portal/staff")
     public ResponseEntity<List<Map<String, Object>>> listStaff(HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
-        List<Map<String, Object>> list = appUserRepository.findByTenantIdOrderByCreatedAtDesc(principal.tenantId()).stream()
+        List<Map<String, Object>> list = appUserRepository.findByTenantIdOrderByCreatedAtDesc(principal.tenantId())
+                .stream()
                 .map(u -> {
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("id", u.getId());
@@ -277,14 +283,20 @@ public class PortalController {
 
     @PostMapping("/api/portal/staff")
     public ResponseEntity<Map<String, Object>> createStaff(
-            @RequestBody Map<String, String> body,
+            @RequestBody CreateStaffRequest body,
             HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
-        String name = body.get("name");
-        String email = body.get("email");
-        String password = body.get("password");
+        requireApprovedTenant(principal.tenantId());
+        String name = body != null ? body.name() : null;
+        String email = body != null ? body.email() : null;
+        String password = body != null && body.password() != null ? body.password().trim() : null;
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_STAFF_INPUT", "email and password are required");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_STAFF_INPUT",
+                    "email and password are required");
+        }
+        if (password.length() < 8) {
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_PASSWORD",
+                    "Password must be at least 8 characters");
         }
         String normalizedEmail = email.trim().toLowerCase();
         if (appUserRepository.findByEmail(normalizedEmail).isPresent()) {
@@ -345,10 +357,12 @@ public class PortalController {
 
     @PutMapping("/api/portal/billing/plan")
     public ResponseEntity<Map<String, Object>> updatePlan(
-            @RequestBody Map<String, String> body,
+            @RequestBody UpdatePlanRequest body,
             HttpServletRequest request) {
         PortalPrincipal principal = requireMerchantOwner(request);
-        Tenant updated = tenantService.updateSubscriptionPlan(principal.tenantId(), body.get("plan"));
+        requireApprovedTenant(principal.tenantId());
+        String plan = body != null ? body.plan() : null;
+        Tenant updated = tenantService.updateSubscriptionPlan(principal.tenantId(), plan);
         auditService.log(principal.tenantId(), principal.email(), "MERCHANT", "PLAN_UPDATED",
                 "TENANT", updated.getId(), "SUCCESS", "plan=" + updated.getSubscriptionPlan(), null);
         return ResponseEntity.ok(Map.of("plan", updated.getSubscriptionPlan()));
@@ -382,7 +396,8 @@ public class PortalController {
 
     private long parsePositiveLong(Object raw, String field) {
         if (!(raw instanceof Number num) || num.longValue() <= 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_RULE_RATE", field + " must be a positive integer");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_RULE_RATE",
+                    field + " must be a positive integer");
         }
         return num.longValue();
     }
@@ -438,5 +453,27 @@ public class PortalController {
         map.put("scopes", created.scopes());
         map.put("createdAt", created.createdAt() != null ? created.createdAt().toString() : null);
         return map;
+    }
+
+    public record CreateApiKeyRequest(String name, String scopes) {
+    }
+
+    public record UpdateRuleRequest(
+            Long earnVndPerPoint,
+            Long redeemValueVndPerPoint,
+            Integer pointExpiryDays,
+            Long silverThresholdPoints,
+            Long goldThresholdPoints,
+            BigDecimal silverMultiplier,
+            BigDecimal goldMultiplier) {
+    }
+
+    public record UpdateWebhookRequest(String webhookUrl, String webhookSecret) {
+    }
+
+    public record CreateStaffRequest(String name, String email, String password) {
+    }
+
+    public record UpdatePlanRequest(String plan) {
     }
 }

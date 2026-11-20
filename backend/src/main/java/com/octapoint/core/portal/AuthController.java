@@ -42,19 +42,23 @@ public class AuthController {
         this.auditService = auditService;
     }
 
-    @PostMapping({"/api/portal/auth/register", "/api/v1/merchants/register"})
+    @PostMapping({ "/api/portal/auth/register", "/api/v1/merchants/register" })
     @Transactional
     public ResponseEntity<Map<String, Object>> register(
-            @RequestBody Map<String, String> body,
+            @RequestBody RegisterRequest body,
             HttpServletRequest request) {
-        String businessName = firstNonBlank(body.get("businessName"), body.get("name"));
-        String ownerName = firstNonBlank(body.get("name"), businessName);
-        String email = body.get("email");
-        String phone = body.get("phone");
-        String password = firstNonBlank(body.get("password"), "Merchant@123");
+        String businessName = body != null ? firstNonBlank(body.businessName(), body.name()) : null;
+        String ownerName = body != null ? firstNonBlank(body.name(), businessName) : null;
+        String email = body != null ? body.email() : null;
+        String phone = body != null ? body.phone() : null;
+        String password = (body != null && body.password() != null) ? body.password().trim() : null;
 
         if (email == null || email.isBlank()) {
             throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_EMAIL", "Email is required");
+        }
+        if (password == null || password.length() < 8) {
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "INVALID_PASSWORD",
+                    "Password must be at least 8 characters");
         }
         String normalizedEmail = email.trim().toLowerCase();
         if (appUserRepository.findByEmail(normalizedEmail).isPresent()) {
@@ -85,11 +89,12 @@ public class AuthController {
     }
 
     @PostMapping("/api/portal/auth/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body) {
-        String email = body.get("email");
-        String password = body.get("password");
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest body) {
+        String email = body != null ? body.email() : null;
+        String password = body != null ? body.password() : null;
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "MISSING_CREDENTIALS", "Email and password are required");
+            throw new ApiException(HttpStatus.BAD_REQUEST.value(), "MISSING_CREDENTIALS",
+                    "Email and password are required");
         }
 
         String normalizedEmail = email.trim().toLowerCase();
@@ -97,7 +102,8 @@ public class AuthController {
                 .orElseThrow(() -> {
                     auditService.log(null, normalizedEmail, "UNKNOWN", "PORTAL_LOGIN", "USER", normalizedEmail,
                             "REJECTED", "Unknown email", null);
-                    return new ApiException(HttpStatus.UNAUTHORIZED.value(), "INVALID_CREDENTIALS", "Invalid email or password");
+                    return new ApiException(HttpStatus.UNAUTHORIZED.value(), "INVALID_CREDENTIALS",
+                            "Invalid email or password");
                 });
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
@@ -134,5 +140,11 @@ public class AuthController {
             return primary.trim();
         }
         return (fallback != null && !fallback.isBlank()) ? fallback.trim() : null;
+    }
+
+    public record RegisterRequest(String businessName, String name, String email, String phone, String password) {
+    }
+
+    public record LoginRequest(String email, String password) {
     }
 }

@@ -19,10 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private final long maxRequestsPerMinute;
+    private final long maxLoginRequestsPerMinute;
     private final ConcurrentHashMap<String, WindowCounter> counters = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(@Value("${app.security.rate-limit-capacity:120}") long maxRequestsPerMinute) {
+    public RateLimitFilter(
+            @Value("${app.security.rate-limit-capacity:120}") long maxRequestsPerMinute,
+            @Value("${app.security.login-rate-limit-capacity:20}") long maxLoginRequestsPerMinute) {
         this.maxRequestsPerMinute = maxRequestsPerMinute;
+        this.maxLoginRequestsPerMinute = maxLoginRequestsPerMinute;
     }
 
     @Override
@@ -32,16 +36,31 @@ public class RateLimitFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-        String path = request.getRequestURI();
-        if (path.startsWith("/actuator/") || path.startsWith("/h2-console")) {
+        String rawUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && rawUri.startsWith(contextPath)) {
+            rawUri = rawUri.substring(contextPath.length());
+        }
+        String path = rawUri != null ? rawUri.replaceAll("/+", "/") : "";
+        if ("/actuator/health".equals(path) || "/actuator/info".equals(path) || path.startsWith("/h2-console")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        boolean isLoginRoute = "/api/portal/auth/login".equals(path);
         String apiKey = request.getHeader("X-OP-Key");
-        String bucketKey = (apiKey != null && !apiKey.isBlank())
-                ? "KEY:" + apiKey
-                : "IP:" + request.getRemoteAddr();
+        String bucketKey;
+        long limit;
+        if (isLoginRoute) {
+            bucketKey = "LOGIN_IP:" + request.getRemoteAddr();
+            limit = maxLoginRequestsPerMinute;
+        } else if (path.startsWith("/api/merchant/v1/") && apiKey != null && !apiKey.isBlank()) {
+            bucketKey = "KEY:" + apiKey.trim();
+            limit = maxRequestsPerMinute;
+        } else {
+            bucketKey = "IP:" + request.getRemoteAddr();
+            limit = maxRequestsPerMinute;
+        }
 
         long nowMinute = Instant.now().getEpochSecond() / 60;
         WindowCounter counter = counters.compute(bucketKey, (k, existing) -> {
@@ -52,10 +71,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return existing;
         });
 
-        if (counter.count > maxRequestsPerMinute) {
+        if (counter.count > limit) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"RATE_LIMITED\",\"message\":\"Rate limit exceeded\",\"status\":429}");
+            response.getWriter()
+                    .write("{\"error\":\"RATE_LIMITED\",\"message\":\"Rate limit exceeded\",\"status\":429}");
             return;
         }
 

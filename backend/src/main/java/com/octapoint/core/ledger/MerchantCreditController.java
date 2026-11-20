@@ -40,12 +40,12 @@ public class MerchantCreditController {
     @PostMapping("/issue")
     public ResponseEntity<Map<String, Object>> issue(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestBody Map<String, Object> body,
+            @RequestBody CreditIssueRequest body,
             HttpServletRequest request) {
         MerchantAuthContext auth = requireScope(request, "ISSUE");
-        String customerId = asString(body.get("customerId"));
-        String orderId = firstNonBlank(asString(body.get("orderId")), asString(body.get("businessTransactionId")));
-        Long amountVnd = asLong(body.get("amountVnd"));
+        String customerId = body != null ? body.customerId() : null;
+        String orderId = body != null ? firstNonBlank(body.orderId(), body.businessTransactionId()) : null;
+        Long amountVnd = body != null ? body.amountVnd() : null;
 
         Map<String, Object> result = ledgerService.issue(
                 auth.tenantId(), customerId, orderId, amountVnd, idempotencyKey, auth.keyId());
@@ -58,12 +58,12 @@ public class MerchantCreditController {
     @PostMapping("/redeem")
     public ResponseEntity<Map<String, Object>> redeem(
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
-            @RequestBody Map<String, Object> body,
+            @RequestBody CreditRedeemRequest body,
             HttpServletRequest request) {
         MerchantAuthContext auth = requireScope(request, "REDEEM");
-        String customerId = asString(body.get("customerId"));
-        String orderId = firstNonBlank(asString(body.get("orderId")), asString(body.get("businessTransactionId")));
-        Long pointsToRedeem = asLong(body.get("pointsToRedeem"));
+        String customerId = body != null ? body.customerId() : null;
+        String orderId = body != null ? firstNonBlank(body.orderId(), body.businessTransactionId()) : null;
+        Long pointsToRedeem = body != null ? body.pointsToRedeem() : null;
 
         try {
             Map<String, Object> result = ledgerService.redeem(
@@ -124,7 +124,8 @@ public class MerchantCreditController {
     private MerchantAuthContext requireScope(HttpServletRequest request, String requiredScope) {
         Object attr = request.getAttribute(MerchantAuthContext.REQUEST_ATTR);
         if (!(attr instanceof MerchantAuthContext ctx)) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED", "Merchant HMAC authentication required");
+            throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED",
+                    "Merchant HMAC authentication required");
         }
         if (!ctx.hasScope(requiredScope)) {
             throw new ApiException(HttpStatus.FORBIDDEN.value(), "INSUFFICIENT_SCOPE",
@@ -133,28 +134,17 @@ public class MerchantCreditController {
         return ctx;
     }
 
-    private String asString(Object val) {
-        return val != null ? String.valueOf(val) : null;
-    }
-
-    private Long asLong(Object val) {
-        if (val instanceof Number num) {
-            return num.longValue();
-        }
-        if (val instanceof String s && !s.isBlank()) {
-            try {
-                return Long.parseLong(s.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
     private String firstNonBlank(String primary, String fallback) {
         if (primary != null && !primary.isBlank()) {
             return primary.trim();
         }
         return (fallback != null && !fallback.isBlank()) ? fallback.trim() : null;
+    }
+
+    public record CreditIssueRequest(String customerId, String orderId, String businessTransactionId, Long amountVnd) {
+    }
+
+    public record CreditRedeemRequest(String customerId, String orderId, String businessTransactionId,
+            Long pointsToRedeem) {
     }
 }

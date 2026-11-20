@@ -21,6 +21,8 @@ app:
     default-admin-email: admin@octapoint.io
     default-admin-password: admin123
     nonce-store: memory
+    webhook:
+      allow-local-targets: true
   settlement:
     mode: MOCK
     worker-enabled: false

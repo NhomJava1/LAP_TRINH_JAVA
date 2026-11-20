@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.octapoint.core.outbox.OutboxEvent;
 import com.octapoint.core.shared.ApiException;
 import com.octapoint.core.shared.HmacCodec;
+import com.octapoint.core.shared.WebhookUrlValidator;
 import com.octapoint.core.tenant.Tenant;
 import com.octapoint.core.tenant.TenantService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -29,16 +31,20 @@ public class WebhookService {
     private final TenantService tenantService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final boolean allowLocalWebhookTargets;
 
     public WebhookService(
             WebhookDeliveryRepository deliveryRepository,
             TenantService tenantService,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            @Value("${app.security.webhook.allow-local-targets:false}") boolean allowLocalWebhookTargets) {
         this.deliveryRepository = deliveryRepository;
         this.tenantService = tenantService;
         this.objectMapper = objectMapper;
+        this.allowLocalWebhookTargets = allowLocalWebhookTargets;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(5))
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
     }
 
@@ -111,6 +117,7 @@ public class WebhookService {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             delivery.setAttemptCount(attempt);
             try {
+                WebhookUrlValidator.validate(tenant.getWebhookUrl(), allowLocalWebhookTargets);
                 HttpRequest req = HttpRequest.newBuilder()
                         .uri(URI.create(tenant.getWebhookUrl()))
                         .timeout(Duration.ofSeconds(5))
@@ -129,8 +136,11 @@ public class WebhookService {
                     return deliveryRepository.save(delivery);
                 }
                 delivery.setLastError("HTTP " + res.statusCode());
+            } catch (ApiException ex) {
+                delivery.setLastError("Webhook target disallowed");
+                break;
             } catch (Exception ex) {
-                delivery.setLastError(ex.getMessage() != null ? ex.getMessage() : "Webhook send failed");
+                delivery.setLastError("Webhook delivery failed");
             }
         }
 

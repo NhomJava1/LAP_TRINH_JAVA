@@ -28,6 +28,10 @@ public class DataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (defaultAdminEmail == null || defaultAdminEmail.isBlank()
+                || defaultAdminPassword == null || defaultAdminPassword.isBlank()) {
+            return;
+        }
         String normalizedEmail = defaultAdminEmail.trim().toLowerCase();
         if (appUserRepository.findByEmail(normalizedEmail).isEmpty()) {
             AppUser admin = new AppUser();

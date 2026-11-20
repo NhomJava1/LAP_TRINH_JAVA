@@ -27,14 +27,32 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        applySecurityHeaders(response);
+
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String path = request.getRequestURI();
-        boolean isAdminRoute = path.startsWith("/api/admin/") || path.startsWith("/api/v1/admin/")
-                || path.equals("/api/v1/api-keys") || path.startsWith("/api/v1/api-keys/");
+        String rawUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        if (contextPath != null && !contextPath.isEmpty() && rawUri.startsWith(contextPath)) {
+            rawUri = rawUri.substring(contextPath.length());
+        }
+
+        String correlationId = ensureCorrelationId(request, response);
+        if (hasSuspiciousPathSequences(rawUri)) {
+            sendError(response, HttpStatus.BAD_REQUEST.value(), "INVALID_PATH", "Invalid request path", correlationId);
+            return;
+        }
+
+        String path = rawUri.replaceAll("/+", "/");
+        boolean isProtectedActuator = (path.equals("/actuator") || path.startsWith("/actuator/"))
+                && !"/actuator/health".equals(path) && !"/actuator/info".equals(path);
+        boolean isAdminRoute = path.equals("/api/admin") || path.startsWith("/api/admin/")
+                || path.equals("/api/v1/admin") || path.startsWith("/api/v1/admin/")
+                || path.equals("/api/v1/api-keys") || path.startsWith("/api/v1/api-keys/")
+                || isProtectedActuator;
         boolean isPortalRoute = (path.startsWith("/api/portal/") && !path.startsWith("/api/portal/auth/"))
                 || path.startsWith("/api/v1/merchants/api-keys")
                 || path.startsWith("/api/v1/credits/");
@@ -43,8 +61,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
-
-        String correlationId = ensureCorrelationId(request, response);
         String token = null;
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -57,7 +73,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         if (token == null || token.isBlank()) {
-            sendError(response, HttpStatus.UNAUTHORIZED.value(), "AUTH_MISSING_TOKEN", "Missing Bearer token", correlationId);
+            sendError(response, HttpStatus.UNAUTHORIZED.value(), "AUTH_MISSING_TOKEN", "Missing Bearer token",
+                    correlationId);
             return;
         }
 
@@ -70,16 +87,32 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         if (isAdminRoute && !"ADMIN".equals(principal.role())) {
-            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_ADMIN_ONLY", "Admin role required", correlationId);
+            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_ADMIN_ONLY", "Admin role required",
+                    correlationId);
             return;
         }
         if (isPortalRoute && !"MERCHANT".equals(principal.role()) && !"STAFF".equals(principal.role())) {
-            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_MERCHANT_ONLY", "Merchant or Staff role required", correlationId);
+            sendError(response, HttpStatus.FORBIDDEN.value(), "FORBIDDEN_MERCHANT_ONLY",
+                    "Merchant or Staff role required", correlationId);
             return;
         }
 
         request.setAttribute(PortalPrincipal.REQUEST_ATTR, principal);
         filterChain.doFilter(request, response);
+    }
+
+    private void applySecurityHeaders(HttpServletResponse response) {
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader("X-Frame-Options", "DENY");
+        response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    }
+
+    private boolean hasSuspiciousPathSequences(String rawUri) {
+        if (rawUri == null) {
+            return false;
+        }
+        String lower = rawUri.toLowerCase();
+        return lower.contains("..") || lower.contains(";") || lower.contains("%2e") || lower.contains("%3b");
     }
 
     private String ensureCorrelationId(HttpServletRequest request, HttpServletResponse response) {
@@ -100,7 +133,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         response.setContentType("application/json");
         response.getWriter().write(String.format(
                 "{\"error\":\"%s\",\"message\":\"%s\",\"status\":%d,\"correlationId\":\"%s\",\"timestamp\":\"%s\"}",
-                code, message.replace("\"", "\\\""), status, correlationId, Instant.now().toString()
-        ));
+                code, message.replace("\"", "\\\""), status, correlationId, Instant.now().toString()));
     }
 }
