@@ -18,20 +18,48 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${JPA_SHOW_SQL:false}
 
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
+
+  task:
+    execution:
+      pool:
+        core-size: 4
+        max-size: 8
 
 management:
   endpoints:
     web:
       exposure:
-        include: '*'
+        include: health,info,metrics,prometheus
 
 app:
   security:
     api-key-master-key: ${API_KEY_MASTER_KEY:12345678901234567890123456789012}
     admin-token: ${API_KEY_ADMIN_TOKEN:octapoint_dev_admin_token}
+    jwt-secret: ${JWT_SECRET:octapoint-local-dev-jwt-secret-key-2026!!}
+    default-admin-email: ${DEFAULT_ADMIN_EMAIL:admin@octapoint.io}
+    default-admin-password: ${DEFAULT_ADMIN_PASSWORD:admin123}
+    nonce-store: ${NONCE_STORE:redis}
+    rate-limit-capacity: ${RATE_LIMIT_CAPACITY:120}
+  settlement:
+    mode: ${SETTLEMENT_MODE:LIVE}
+    worker-enabled: ${SETTLEMENT_WORKER_ENABLED:true}
+    poll-interval-ms: ${SETTLEMENT_POLL_MS:5000}
+    max-retries: ${SETTLEMENT_MAX_RETRIES:3}
+  signer:
+    base-url: ${SIGNER_BASE_URL:http://signer:3001}
+    service-token: ${SIGNER_SERVICE_TOKEN:replace-with-random-internal-token}
+  walrus:
+    poc-enabled: ${WALRUS_POC_ENABLED:false}
+    publisher-url: ${WALRUS_PUBLISHER_URL:https://publisher.walrus-testnet.walrus.space}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

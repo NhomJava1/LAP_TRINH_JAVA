@@ -1,9 +1,9 @@
 # OctaPoint: Requirement Index, MVP Scope và Kịch bản demo
 
-| **Phiên bản** | 0.2 |
+| **Phiên bản** | 0.2 (Đã chốt) |
 |---|---|
-| **Ticket** | SCRUM-11 |
-| **Trạng thái** | Dự thảo sửa đổi từ v0.1, chờ review của nhóm |
+| **Ticket** | SCRUM-11, SCRUM-97 |
+| **Trạng thái** | Đã chốt và phê duyệt (Approved theo SCRUM-97, 10/11/2026) |
 
 ---
 
@@ -23,7 +23,8 @@
 | 10 | 3.1 (mới) | Thêm danh sách tài liệu bắt buộc theo yêu cầu môn học (URD, SRS, UML, test plan...) | v0.1 chỉ nhắc README, API docs, kiến trúc, hướng dẫn demo |
 | 11 | 4 | Thêm bước kiểm tra replay đúng chữ ký (401 nonce), nhắc rehearse độ trễ settlement, thêm bước 10 tùy chọn cho MCP | Demo cần chứng minh replay và idempotency là hai cơ chế riêng |
 | 12 | 5 | Tách `settlementMode` (LIVE/MOCK) khỏi `settlementStatus` | Tránh trộn "chế độ chạy" với "trạng thái settlement" |
-| 13 | 6, 7 | Bổ sung tiêu chí hoàn thành; thêm mục 7 "Quy tắc hạ ưu tiên khi trễ" và mục 8 "Câu hỏi mở" | Quyết định cắt phạm vi từ trước, không quyết khi đã trễ |
+| 13 | 6, 7 | Bổ sung tiêu chí hoàn thành; thêm mục 7 "Quy tắc hạ ưu tiên khi trễ" | Quyết định cắt phạm vi từ trước, không quyết khi đã trễ |
+| 14 | 2.3, 2.4, 8 | Nâng FR-33 từ Could lên Should; bổ sung mục 8 ghi nhận Biên bản 5 quyết định Q1-Q5 đã chốt | Thực hiện SCRUM-97, chốt tài liệu v0.2 |
 
 ---
 
@@ -179,6 +180,7 @@ Chống replay và idempotency là hai cơ chế riêng biệt. Không dùng m�
 | FR-27 | Hạn mức gas theo tenant | Đếm gas đã dùng theo tenant, vượt hạn mức thì dừng đưa lệnh lên chain (giao dịch nghiệp vụ vẫn thành công, settlement chờ nâng hạn mức). |
 | FR-28 | Webhook | Gửi webhook khi giao dịch SETTLED, ký HMAC, có retry. SDK có hàm xác minh chữ ký. |
 | FR-29 | Đối soát DB và chain | Job định kỳ so số dư PostgreSQL với `CreditAccount` on-chain, lưu kết quả, cảnh báo khi lệch. |
+| FR-33 | Retry settlement FAILED | Admin xem và kích hoạt retry thủ công cho giao dịch FAILED để giải phóng tắc nghẽn head-of-line blocking. |
 
 ### 2.4. Could, chỉ thực hiện nếu còn thời gian
 
@@ -192,7 +194,6 @@ Chống replay và idempotency là hai cơ chế riêng biệt. Không dùng m�
 | FR-30 | Anchor hash lô sổ cái lên Sui để chống sửa đổi lịch sử. |
 | FR-31 | Vai trò STAFF (nhân viên merchant) với quyền hạn chế. |
 | FR-32 | MCP tool ghi (ví dụ kích hoạt campaign), chỉ chạy sau bước xác nhận của người dùng. |
-| FR-33 | Admin retry thủ công giao dịch FAILED. |
 
 ### 2.5. Won't, không thuộc MVP
 
@@ -236,6 +237,10 @@ Các hạng mục sau không làm trong MVP, có thể mô tả trong phần hư
 | D-08 | Installation Guide (README) | Must | Sprint 7 |
 | D-09 | User Manual (Merchant, Admin) | Must | Sprint 8 |
 | D-10 | Tài liệu API (OpenAPI) | Must | Sprint 4 |
+
+**Hoàn thiện D-04:** component diagram, ERD theo mô hình MVP mục tiêu và state diagram
+được lưu dưới dạng PlantUML và PNG tại [`docs/6.Component`](../6.Component/),
+[`docs/7.ERD`](../7.ERD/) và [`docs/8.StateDiagram`](../8.StateDiagram/).
 
 ---
 
@@ -301,3 +306,32 @@ Cổng cắt phạm vi: cuối Sprint 5 (3–7/11). Nếu Must chưa xong, áp d
 FR-17 (MCP) giữ ở Should cao vì tên đề tài có MCP. Cắt FR-17 chỉ khi đã cắt hết các mục trên.
 
 ---
+
+## 8. Biên bản 5 quyết định chốt phạm vi (Q1 - Q5)
+
+Họp nhóm thống nhất ngày 06/11/2026, phê duyệt và ban hành ngày 10/11/2026 theo SCRUM-97:
+
+### Q1. Mục tiêu và chuẩn tài liệu nghiệm thu
+- **Quyết định:** Dự án phục vụ nghiệm thu môn học Lập trình Java theo đề tài "Credit-as-a-Service đa tenant trên Sui Blockchain".
+- **Chuẩn tài liệu:** Áp dụng đặc tả IEEE 830-1998 cho SRS (`docs/1.SRS/srs-v1.0.md`).
+- **Phạm vi cam kết:** Đạt 100% yêu cầu Must tầng A1 (FR-01 đến FR-15, NFR-01 đến NFR-05) trước ngày code freeze Sprint 7 (21/11/2026).
+
+### Q2. Hợp đồng API và xác thực HMAC
+- **Quyết định:** Chuẩn hóa toàn bộ endpoint theo tiền tố `/api/merchant/v1/**` cho Merchant API và `/api/portal/**`, `/api/admin/**` cho Web Portal/Admin.
+- **Header HMAC:** Thống nhất dùng chuẩn ADR-0003: `X-OP-Key`, `X-OP-Timestamp`, `X-OP-Nonce`, `X-OP-Signature`.
+- **String-to-Sign:** `HTTP-Method + "\n" + Path + "\n" + CanonicalQuery + "\n" + Timestamp + "\n" + Nonce + "\n" + SHA256(Body)`. Cập nhật `HmacFilter` và SDK theo test vector chung, xóa bỏ secret thử nghiệm.
+
+### Q3. Nguồn sự thật dữ liệu và quản trị schema
+- **Quyết định:** PostgreSQL 15 là nguồn dữ liệu duy nhất có thẩm quyền (SSOT). Số dư khả dụng và sổ cái append-only được cập nhật tức thời qua PostgreSQL transaction.
+- **Quản lý schema:** Flyway migration bất biến. V1 và V2 giữ nguyên; mọi bổ sung trường outbox thực hiện qua migration V3 (`V3__outbox_fields.sql`).
+- **Trạng thái:** Tenant: `PENDING`, `APPROVED`, `REJECTED`, `SUSPENDED`. Settlement: `PENDING`, `SETTLED`, `FAILED`. Trưởng nhóm (Minh Hoang) phê duyệt mọi thay đổi schema và mô hình dữ liệu.
+
+### Q4. Bằng chứng kiểm thử Sui Testnet
+- **Quyết định:** Kết quả publish và gọi `issue` trong `signer-report.md` (Move v0) được chấp nhận làm bằng chứng spike kỹ thuật.
+- **Cam kết Sprint 7:** Phải có ít nhất một giao dịch settlement LIVE thực tế từ Backend qua Signer lên Sui Testnet, lưu transaction digest và chụp ảnh Sui Explorer lưu vào `docs/` để nghiệm thu NFR-05. Nếu Testnet gián đoạn trong buổi bảo vệ, sử dụng bằng chứng đã lưu kèm video demo dự phòng.
+
+### Q5. Chiến lược hạ ưu tiên và nâng cấp FR-33
+- **Quyết định:** Nâng `FR-33` (Admin retry thủ công giao dịch FAILED) từ Could lên **Should**.
+- **Lý do:** Khi xảy ra lỗi settlement, cơ chế head-of-line blocking sẽ chặn các sự kiện tiếp theo của cùng khách hàng. Admin cần công cụ retry thủ công trên giao diện/API để giải phóng tắc nghẽn sau khi đã đối soát hoặc xử lý nguyên nhân lỗi.
+- **Thứ tự hạ ưu tiên khi trễ:** Áp dụng nghiêm ngặt theo bảng tại mục 7: Cắt toàn bộ Could -> Cắt Should (FR-19, FR-27, FR-29, FR-28) -> Chuyển cấu hình rule sang API -> Thu gọn Admin Portal.
+

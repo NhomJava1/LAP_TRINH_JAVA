@@ -1,0 +1,145 @@
+@startuml
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam entity {
+  BackgroundColor #F7FAFC
+  BorderColor #36566F
+}
+
+title OctaPoint - ERD (MVP target schema)
+
+entity tenant {
+  * id : UUID <<PK>>
+  --
+  name : VARCHAR(255)
+  status : VARCHAR(30)
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+}
+
+entity app_user {
+  * id : UUID <<PK>>
+  --
+  tenant_id : UUID <<FK, nullable>>
+  email : VARCHAR(255) <<UQ>>
+  password_hash : VARCHAR(255)
+  role : ADMIN | MERCHANT
+  created_at : TIMESTAMPTZ
+}
+
+entity api_key {
+  * key_id : VARCHAR(64) <<PK>>
+  --
+  tenant_id : UUID <<FK>>
+  encrypted_secret : TEXT
+  status : ACTIVE | REVOKED
+  scopes : VARCHAR(100)
+  created_at : TIMESTAMPTZ
+  revoked_at : TIMESTAMPTZ, nullable
+}
+
+entity tenant_rule {
+  * id : UUID <<PK>>
+  --
+  tenant_id : UUID <<FK>>
+  earn_vnd_per_point : BIGINT
+  redeem_value_vnd_per_point : BIGINT
+  effective_from : TIMESTAMPTZ
+  created_at : TIMESTAMPTZ
+}
+
+entity customer_balance {
+  * tenant_id : UUID <<PK, FK>>
+  * customer_id : VARCHAR(128) <<PK>>
+  --
+  amount : BIGINT
+  next_chain_seq : BIGINT
+  updated_at : TIMESTAMPTZ
+}
+
+entity idempotency_record {
+  * tenant_id : UUID <<PK, FK>>
+  * idempotency_key : VARCHAR(128) <<PK>>
+  --
+  request_hash : CHAR(64)
+  response_body : JSONB
+  status_code : INT
+  created_at : TIMESTAMPTZ
+}
+
+entity ledger_entry {
+  * id : UUID <<PK>>
+  --
+  tenant_id : UUID <<FK>>
+  customer_id : VARCHAR(128)
+  idempotency_key : VARCHAR(128)
+  request_hash : CHAR(64)
+  entry_type : ISSUE | REDEEM
+  points : BIGINT
+  balance_after : BIGINT
+  chain_seq : BIGINT
+  created_at : TIMESTAMPTZ
+  --
+  UQ (tenant_id, idempotency_key)
+  append-only
+}
+
+entity outbox_event {
+  * id : UUID <<PK>> (eventId)
+  --
+  tenant_id : UUID <<FK>>
+  customer_id : VARCHAR(128)
+  event_type : VARCHAR(30)
+  chain_seq : BIGINT
+  payload : JSONB
+  status : PENDING | PROCESSING | SETTLED | FAILED
+  settlement_mode : LIVE | MOCK
+  attempts : INT
+  next_retry_at : TIMESTAMPTZ
+  tx_digest : VARCHAR(128), nullable
+  last_error : TEXT, nullable
+  created_at : TIMESTAMPTZ
+  updated_at : TIMESTAMPTZ
+}
+
+entity audit_log {
+  * id : UUID <<PK>>
+  --
+  tenant_id : UUID <<FK, nullable>>
+  actor_user_id : UUID <<FK, nullable>>
+  action : VARCHAR(100)
+  resource_type : VARCHAR(100)
+  resource_id : VARCHAR(128), nullable
+  details : JSONB
+  correlation_id : VARCHAR(128)
+  created_at : TIMESTAMPTZ
+}
+
+tenant ||--o{ app_user : tenant_id
+tenant ||--o{ api_key : tenant_id
+tenant ||--o{ tenant_rule : tenant_id
+tenant ||--o{ customer_balance : tenant_id
+tenant ||--o{ idempotency_record : tenant_id
+tenant ||--o{ ledger_entry : tenant_id
+tenant ||--o{ outbox_event : tenant_id
+tenant |o--o{ audit_log : tenant_id
+app_user |o--o{ audit_log : actor_user_id
+customer_balance ||--o{ ledger_entry : tenant_id + customer_id
+customer_balance ||--o{ outbox_event : tenant_id + customer_id
+
+note right of ledger_entry
+  Issue/redeem transaction:
+  balance + ledger + outbox
+  commit atomically.
+  UPDATE/DELETE are forbidden.
+end note
+
+note right of outbox_event
+  Worker preserves chain_seq order
+  per tenant/customer.
+  FAILED blocks later events
+  for that customer queue.
+end note
+@enduml

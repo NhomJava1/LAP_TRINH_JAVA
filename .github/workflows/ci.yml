@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "master", "develop" ]
+    branches: [ "main", "master", "develop", "dev-hoangminh" ]
   pull_request:
     branches: [ "main", "master", "develop" ]
 
@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   backend:
-    name: Backend build and test
+    name: Backend build & verify (Unit + ArchUnit + Integration + Concurrency)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -20,18 +20,38 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
           cache: maven
 
-      - name: Build and test backend
+      - name: Build and verify backend
         run: mvn --batch-mode verify
 
+  sdk-java:
+    name: Java 25 SDK build & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk-java
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Test Java SDK
+        run: mvn --batch-mode test
+
   signer:
-    name: Signer build and test
+    name: Sui Signer typecheck & build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,13 +67,50 @@ jobs:
           cache: npm
           cache-dependency-path: signer/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install, test and build signer
+        run: npm ci && npm test && npm run build
 
-      - name: Type-check signer
-        run: npm test
+  sdk-ts-and-mcp:
+    name: TypeScript SDK & MCP Server test & build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build signer
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test and build TypeScript SDK
+        working-directory: sdk-ts
+        run: npm ci && npm test && npm run build
+
+      - name: Test and build MCP Server
+        working-directory: mcp-server
+        run: npm ci && npm test && npm run build
+
+  frontend:
+    name: Next.js Portal lint & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and lint frontend
+        run: npm ci && npm run lint
+
+      - name: Build frontend
         run: npm run build
 
   docker:
