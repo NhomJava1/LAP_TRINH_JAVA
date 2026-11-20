@@ -1,89 +1,67 @@
-import Link from "next/link";
-
-const API_DOCS_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080").replace(/\/+$/, "") +
-  "/swagger-ui.html";
+import Image from "next/image";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white flex flex-col">
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between max-w-6xl w-full mx-auto">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500 font-bold text-white">
-            O
-          </span>
-          <span className="font-bold text-lg tracking-tight">OctaPoint</span>
-        </div>
-        <nav className="flex items-center gap-3 text-sm">
-          <Link
-            href="/login"
-            className="px-4 py-2 rounded-lg text-slate-200 hover:bg-white/10 transition"
-          >
-            Đăng nhập
-          </Link>
-          <Link
-            href="/register"
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 font-medium transition"
-          >
-            Đăng ký Merchant
-          </Link>
-        </nav>
-      </header>
-
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-16 flex flex-col justify-center">
-        <div className="max-w-3xl space-y-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-blue-500/10 px-3 py-1 text-xs font-medium text-blue-300">
-            MVP Credit-as-a-Service • PostgreSQL SSOT + Sui Testnet Settlement
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight">
-            Nền tảng tích lũy &amp; quy đổi điểm thưởng đa Merchant trên Sui Blockchain
+    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
+      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
+        <Image
+          className="dark:invert h-5 w-[100px]"
+          src="/next.svg"
+          alt="Next.js logo"
+          width={100}
+          height={20}
+          priority
+        />
+        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
+          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
+            To get started, edit the{" "}
+            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
+              page.tsx
+            </code>{" "}
+            file.
           </h1>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            Xử lý giao dịch nghiệp vụ tức thời trên sổ cái PostgreSQL bất biến, bảo mật API bằng chữ ký HMAC-SHA256 + Redis chống phát lại, và đối soát bất đồng bộ lên Sui Testnet qua Outbox Worker.
-          </p>
-          <div className="flex flex-wrap gap-4 pt-2">
-            <Link
-              href="/login"
-              className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-500 font-semibold transition"
-            >
-              Đăng nhập Portal
-            </Link>
-            <Link
-              href="/register"
-              className="px-6 py-3 rounded-lg bg-white text-slate-900 hover:bg-slate-100 font-semibold transition"
-            >
-              Đăng ký Merchant mới
-            </Link>
+          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
+            Looking for a starting point or more instructions? Head over to{" "}
             <a
-              href={API_DOCS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-6 py-3 rounded-lg border border-white/20 hover:bg-white/10 font-semibold transition"
+              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
             >
-              API Docs (Swagger UI)
-            </a>
-          </div>
+              Templates
+            </a>{" "}
+            or the{" "}
+            <a
+              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+              className="font-medium text-zinc-950 dark:text-zinc-50"
+            >
+              Learning
+            </a>{" "}
+            center.
+          </p>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-            <h2 className="font-semibold text-blue-300 mb-2">1. Đa Tenant &amp; Phê duyệt</h2>
-            <p className="text-sm text-slate-300">
-              Merchant đăng ký trực tuyến, Admin kiểm duyệt trạng thái PENDING → APPROVED, cấu hình rule tích/đổi điểm và phát hành API key mã hóa AES-256-GCM.
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-            <h2 className="font-semibold text-emerald-300 mb-2">2. HMAC-SHA256 &amp; Idempotency</h2>
-            <p className="text-sm text-slate-300">
-              Chuẩn xác thực server-to-server ADR-0003 với header X-OP-*, chống replay attack bằng Redis SETNX và đảm bảo không âm điểm khi redeem đồng thời.
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6">
-            <h2 className="font-semibold text-purple-300 mb-2">3. Outbox &amp; Sui Explorer</h2>
-            <p className="text-sm text-slate-300">
-              Worker gom lô bất đồng bộ qua TypeScript Signer lên Sui Testnet, lưu transaction digest thật để kiểm chứng minh bạch và hỗ trợ retry khi lỗi.
-            </p>
-          </div>
+        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <a
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
+            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Image
+              className="dark:invert h-[14px] w-4"
+              src="/vercel.svg"
+              alt="Vercel logomark"
+              width={16}
+              height={14}
+            />
+            Deploy Now
+          </a>
+          <a
+            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
+            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Documentation
+          </a>
         </div>
       </main>
     </div>

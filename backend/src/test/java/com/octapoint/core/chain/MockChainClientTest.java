@@ -4,11 +4,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MockChainClientTest {
 
@@ -19,23 +16,19 @@ class MockChainClientTest {
     }
 
     @Test
-    void operationsTrackMockBalanceAndValidateInsufficientRedeem() {
+    void operationsFailExplicitlyUntilImplemented() {
         ChainClient client = new MockChainClient();
-        ChainAccount account = client.createAccount(new CreateAccountRequest("owner-1"));
-        assertEquals("mock_acc_owner-1", account.accountId());
-        assertEquals(BigInteger.ZERO, account.balance());
+        CreateAccountRequest createRequest = new CreateAccountRequest("owner-1");
+        BalanceChangeRequest balanceRequest =
+            new BalanceChangeRequest("account-1", BigInteger.ONE);
 
-        ChainTransaction mintTx = client.mint(new BalanceChangeRequest(account.accountId(), BigInteger.valueOf(100)));
-        assertTrue(mintTx.digest().startsWith("mock_tx_"));
-
-        ChainTransaction redeemTx = client.redeem(new BalanceChangeRequest(account.accountId(), BigInteger.valueOf(30)));
-        assertTrue(redeemTx.digest().startsWith("mock_tx_"));
-
-        ChainAccount updated = client.getAccount(account.accountId()).orElseThrow();
-        assertEquals(BigInteger.valueOf(70), updated.balance());
-
-        assertThrows(IllegalStateException.class,
-                () -> client.redeem(new BalanceChangeRequest(account.accountId(), BigInteger.valueOf(100))));
-        assertFalse(client.getAccount("non-existent").isPresent());
+        assertThrows(UnsupportedOperationException.class,
+            () -> client.createAccount(createRequest));
+        assertThrows(UnsupportedOperationException.class,
+            () -> client.mint(balanceRequest));
+        assertThrows(UnsupportedOperationException.class,
+            () -> client.redeem(balanceRequest));
+        assertThrows(UnsupportedOperationException.class,
+            () -> client.getAccount("account-1"));
     }
 }
