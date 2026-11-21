@@ -1,5 +1,9 @@
 package com.octapoint.core.apikey;
 
+import com.octapoint.core.security.PortalPrincipal;
+import com.octapoint.core.shared.ApiException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,24 +24,31 @@ public class ApiKeyController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createApiKey() {
+    public ResponseEntity<?> createApiKey(HttpServletRequest request) {
+        Object attr = request.getAttribute(PortalPrincipal.REQUEST_ATTR);
+        if (!(attr instanceof PortalPrincipal principal)) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED.value(), "AUTH_REQUIRED", "Admin authentication required");
+        }
+        if (!"ADMIN".equals(principal.role())) {
+            throw new ApiException(HttpStatus.FORBIDDEN.value(), "FORBIDDEN_ADMIN_ONLY", "Admin role required");
+        }
+
         try {
             String keyId = "ak_" + UUID.randomUUID().toString();
-            
+
             byte[] secretBytes = new byte[32];
             SecureRandom.getInstanceStrong().nextBytes(secretBytes);
             String rawSecret = Base64.getUrlEncoder().withoutPadding().encodeToString(secretBytes);
 
-            ApiKeyService.EncryptedResult encryptedResult = apiKeyService.encrypt(rawSecret);
+            apiKeyService.encrypt(rawSecret);
 
             return ResponseEntity.ok(Map.of(
                     "key_id", keyId,
                     "secret", rawSecret,
-                    "created_at", Instant.now().toString()
-            ));
+                    "created_at", Instant.now().toString()));
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to create API key"));
         }
     }
 }

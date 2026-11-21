@@ -31,6 +31,19 @@ services:
     stdin_open: true
     tty: true
 
+  signer:
+    build:
+      context: .
+      dockerfile: signer/Dockerfile
+    container_name: octapoint_signer
+    env_file:
+      - path: ./signer/.env
+        required: false
+    environment:
+      PORT: "3001"
+    ports:
+      - "3001:3001"
+
   core:
     build:
       context: .
@@ -45,11 +58,16 @@ services:
       REDIS_PORT: 6379
       API_KEY_MASTER_KEY: ${API_KEY_MASTER_KEY:?Set API_KEY_MASTER_KEY in .env}
       API_KEY_ADMIN_TOKEN: ${API_KEY_ADMIN_TOKEN:?Set API_KEY_ADMIN_TOKEN in .env}
+      JWT_SECRET: ${JWT_SECRET:-octapoint-local-dev-jwt-secret-key-2026!!}
+      SETTLEMENT_MODE: ${SETTLEMENT_MODE:-LIVE}
+      SIGNER_BASE_URL: ${SIGNER_BASE_URL:-http://signer:3001}
+      SIGNER_SERVICE_TOKEN: ${SIGNER_SERVICE_TOKEN:-replace-with-random-internal-token}
     ports:
       - "8080:8080"
     depends_on:
       - postgres
       - redis
+      - signer
 
 volumes:
   pgdata:
